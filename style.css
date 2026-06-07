@@ -1,0 +1,82 @@
+.imw-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.25rem 0;
+}
+
+.imw-panel label {
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.imw-row,
+.imw-grid {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.imw-row-top {
+    flex-wrap: wrap;
+}
+
+.imw-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.imw-grid label {
+    display: grid;
+    grid-template-columns: 88px minmax(90px, 1fr) 36px;
+}
+
+.imw-check {
+    white-space: nowrap;
+}
+
+.imw-panel select,
+.imw-panel button {
+    background: var(--button-secondary-background-fill);
+    border: 1px solid var(--button-secondary-border-color);
+    border-radius: 6px;
+    color: var(--body-text-color);
+    min-height: 2rem;
+    padding: 0 0.6rem;
+}
+
+.imw-panel button:hover {
+    background: var(--button-secondary-background-fill-hover);
+}
+
+.imw-actions {
+    flex-wrap: wrap;
+}
+
+#imw_status {
+    color: var(--body-text-color-subdued);
+    min-width: 8rem;
+}
+
+#imw_status[data-kind="ok"] {
+    color: var(--button-primary-background-fill, #2b8a3e);
+}
+
+#imw_status[data-kind="warn"],
+#imw_status[data-kind="error"] {
+    color: var(--error-text-color, #b91c1c);
+}
+
+@media (max-width: 700px) {
+    .imw-row,
+    .imw-grid {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .imw-grid label {
+        grid-template-columns: 84px minmax(90px, 1fr) 34px;
+    }
+}

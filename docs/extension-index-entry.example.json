@@ -1,0 +1,11 @@
+{
+  "name": "Inpaint Magic Wand",
+  "url": "https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git",
+  "description": "A lightweight magic-wand selector for Forge / Neo Forge img2img inpaint masks. Runs in the browser, needs no model downloads, and writes directly into the native inpaint canvas.",
+  "tags": [
+    "script",
+    "UI related",
+    "editing",
+    "manipulations"
+  ]
+}
