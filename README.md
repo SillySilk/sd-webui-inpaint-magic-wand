@@ -2,6 +2,8 @@
 
 A lightweight magic-wand mask selector for Stable Diffusion WebUI Forge / Neo Forge.
 
+<img width="894" height="172" alt="image" src="https://github.com/user-attachments/assets/0f064c19-cebc-4226-9d3e-ca6bb5ad54da" />
+
 This extension adds a `Magic Wand Integrated` accordion to the `img2img` page. In
 `img2img -> Inpaint`, enable click selection and click the original image to create
 or edit the inpaint mask directly on the built-in Forge canvas.
