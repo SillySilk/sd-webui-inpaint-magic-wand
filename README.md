@@ -1,10 +1,22 @@
-﻿# Inpaint Magic Wand
+# Inpaint Magic Wand
 
 A lightweight magic-wand mask selector for Stable Diffusion WebUI Forge / Neo Forge.
 
-This extension adds a `Magic Wand Integrated` accordion to the `img2img` page. In `img2img -> Inpaint`, enable click selection and click the original image to create or edit the inpaint mask directly on the built-in Forge canvas.
+This extension adds a `Magic Wand Integrated` accordion to the `img2img` page. In
+`img2img -> Inpaint`, enable click selection and click the original image to create
+or edit the inpaint mask directly on the built-in Forge canvas.
 
-Unlike Segment Anything based tools, this extension does not download a model, load a checkpoint, or send the image through Python. The selection runs in the browser and writes the result into Forge's existing inpaint mask layer.
+Unlike Segment Anything based tools, this extension does not download a model, load a
+checkpoint, or send the image through Python. The selection runs in the browser and
+writes the result into Forge's existing inpaint mask layer.
+
+## Origin
+
+This extension was spec-coded. It started with a Matt Pocock-style "grill me"
+session that pressure-tested the idea and helped choose the simplest design: stay
+inside the existing Forge inpaint canvas instead of adding another tab or model
+workflow. The implementation, debugging, and packaging were completed with tools
+from Anthropic and OpenAI.
 
 ## Features
 
@@ -20,9 +32,12 @@ Unlike Segment Anything based tools, this extension does not download a model, l
 
 ## Compatibility
 
-Tested with Stable Diffusion WebUI Forge - Neo / Neo Forge using Gradio 4 and Forge's `ForgeCanvas` inpaint UI.
+Tested with Stable Diffusion WebUI Forge - Neo / Neo Forge using Gradio 4 and
+Forge's `ForgeCanvas` inpaint UI.
 
-This is not a stock AUTOMATIC1111 canvas extension. It depends on Forge's `img2maskimg` / `ForgeCanvas` DOM structure. If another WebUI does not expose that canvas, the accordion may appear but click selection will not work.
+This is not a stock AUTOMATIC1111 canvas extension. It depends on Forge's
+`img2maskimg` / `ForgeCanvas` DOM structure. If another WebUI does not expose that
+canvas, the accordion may appear but click selection will not work.
 
 ## Installation
 
@@ -59,7 +74,9 @@ Then restart the WebUI or reload the UI.
 6. Click the source image to create a mask.
 7. Generate with Forge's normal inpaint controls.
 
-The generated mask is the same mask Forge uses for inpainting, so `Mask blur`, `Mask mode`, `Masked content`, `Inpaint area`, and `Only masked padding` still work normally.
+The generated mask is the same mask Forge uses for inpainting, so `Mask blur`,
+`Mask mode`, `Masked content`, `Inpaint area`, and `Only masked padding` still work
+normally.
 
 ## Controls
 
@@ -69,7 +86,8 @@ The generated mask is the same mask Forge uses for inpainting, so `Mask blur`, `
 
 `Mode`: how the new selection combines with the current mask.
 
-`Contiguous`: when enabled, only connected pixels around the click are selected. When disabled, all matching pixels in the image are selected.
+`Contiguous`: when enabled, only connected pixels around the click are selected.
+When disabled, all matching pixels in the image are selected.
 
 `Clear mask`: removes the current inpaint mask.
 
@@ -77,9 +95,13 @@ The generated mask is the same mask Forge uses for inpainting, so `Mask blur`, `
 
 ## How It Differs From SAM Extensions
 
-Segment Anything extensions are semantic/object segmentation tools. They are more powerful for object selection, but need model files, server-side inference, and often a separate mask-transfer workflow.
+Segment Anything extensions are semantic/object segmentation tools. They are more
+powerful for object selection, but need model files, server-side inference, and often
+a separate mask-transfer workflow.
 
-Inpaint Magic Wand is a small canvas tool. It is closer to the color-selection wand in an image editor. It is fast, dependency-free, and designed to stay inside the native Forge inpaint panel.
+Inpaint Magic Wand is a small canvas tool. It is closer to the color-selection wand
+in an image editor. It is fast, dependency-free, and designed to stay inside the
+native Forge inpaint panel.
 
 ## Troubleshooting
 
@@ -87,9 +109,11 @@ If the accordion does not appear, restart the WebUI after installation.
 
 If clicks still draw with the brush, make sure `Enable click selection` is checked.
 
-If the status says `No inpaint image`, switch to `img2img -> Inpaint` and upload an image there.
+If the status says `No inpaint image`, switch to `img2img -> Inpaint` and upload an
+image there.
 
-If the panel appears after an update but clicks do nothing, hard-refresh the browser or reload the UI so the JavaScript is reloaded.
+If the panel appears after an update but clicks do nothing, hard-refresh the browser
+or reload the UI so the JavaScript is reloaded.
 
 ## License
 
