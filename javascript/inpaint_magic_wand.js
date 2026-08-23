@@ -79,6 +79,51 @@
         return { uuid, container, image, drawingCanvas, foreground };
     }
 
+    function syncToolbarButton(info) {
+        const button = app().getElementById(`imw_toolbar_toggle_${info.uuid}`);
+        if (!button) return;
+
+        const enabled = checkboxValue("imw_enabled", false);
+        button.classList.toggle("imw-toolbar-wand-active", enabled);
+        button.setAttribute("aria-pressed", enabled ? "true" : "false");
+        button.title = enabled ? "Magic Wand: on" : "Magic Wand: off";
+    }
+
+    function setMagicWandEnabled(enabled) {
+        const checkbox = byId("imw_enabled");
+        if (checkbox) {
+            checkbox.checked = enabled;
+            checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+        } else {
+            setStatus(enabled ? "Magic wand on" : "Magic wand off", enabled ? "ok" : "");
+        }
+
+        const info = getInpaintForgeCanvas();
+        if (info) syncToolbarButton(info);
+    }
+
+    function toggleMagicWandFromToolbar(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        setMagicWandEnabled(!checkboxValue("imw_enabled", false));
+    }
+
+    function attachToolbarButton(info) {
+        const centerButton = app().getElementById(`centerButton_${info.uuid}`);
+        if (!centerButton || app().getElementById(`imw_toolbar_toggle_${info.uuid}`)) return;
+
+        const button = document.createElement("button");
+        button.id = `imw_toolbar_toggle_${info.uuid}`;
+        button.type = "button";
+        button.className = "forge-btn imw-toolbar-wand";
+        button.textContent = "W";
+        button.setAttribute("aria-label", "Toggle Magic Wand");
+        button.addEventListener("click", toggleMagicWandFromToolbar);
+
+        centerButton.insertAdjacentElement("afterend", button);
+        syncToolbarButton(info);
+    }
+
     function imagePixels(image, width, height) {
         const canvas = document.createElement("canvas");
         canvas.width = width;
@@ -362,7 +407,14 @@
 
     function attachCanvas() {
         const info = getInpaintForgeCanvas();
-        if (!info || info.drawingCanvas.dataset.imwAttached === "true") return;
+        if (!info) return;
+
+        attachToolbarButton(info);
+
+        if (info.drawingCanvas.dataset.imwAttached === "true") {
+            syncToolbarButton(info);
+            return;
+        }
 
         info.drawingCanvas.addEventListener("pointerdown", runSelection, true);
         info.drawingCanvas.dataset.imwAttached = "true";
@@ -394,6 +446,8 @@
         if (enabled) {
             enabled.addEventListener("change", () => {
                 setStatus(enabled.checked ? "Click inpaint image" : "Idle", enabled.checked ? "ok" : "");
+                const info = getInpaintForgeCanvas();
+                if (info) syncToolbarButton(info);
             });
         }
         if (clear) clear.addEventListener("click", clearMask);

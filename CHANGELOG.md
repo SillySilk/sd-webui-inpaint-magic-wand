@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added an in-canvas toolbar toggle beside `Center Position [R]` for enabling or disabling Magic Wand without scrolling to the accordion.
+
 ## 0.1.0
 
 - Initial public release.

@@ -28,6 +28,7 @@ from Anthropic and OpenAI.
 - Contiguous or global color selection.
 - Adjustable tolerance and mask growth.
 - Clear and invert mask actions.
+- In-canvas toolbar toggle next to `Center Position [R]`.
 - No Python package dependencies.
 - No model downloads.
 - No extra tabs.
@@ -72,7 +73,7 @@ Then restart the WebUI or reload the UI.
 2. Open the `Inpaint` image mode.
 3. Upload or paste an image.
 4. Open `Magic Wand Integrated`.
-5. Enable `Enable click selection`.
+5. Enable `Enable click selection`, or use the `W` toolbar button beside `Center Position [R]` in the image frame.
 6. Click the source image to create a mask.
 7. Generate with Forge's normal inpaint controls.
 
@@ -94,6 +95,8 @@ When disabled, all matching pixels in the image are selected.
 `Clear mask`: removes the current inpaint mask.
 
 `Invert mask`: flips the current inpaint mask.
+
+`W` toolbar button: toggles Magic Wand on/off from the inpaint image frame, without scrolling back to the accordion.
 
 ## How It Differs From SAM Extensions
 
