@@ -5,8 +5,8 @@ A lightweight magic-wand mask selector for Stable Diffusion WebUI Forge / Neo Fo
 <img width="894" height="172" alt="image" src="https://github.com/user-attachments/assets/0f064c19-cebc-4226-9d3e-ca6bb5ad54da" />
 
 This extension adds a `Magic Wand Integrated` accordion to the `img2img` page. In
-`img2img -> Inpaint`, enable click selection and click the original image to create
-or edit the inpaint mask directly on the built-in Forge canvas.
+`img2img -> Inpaint` or `img2img -> Inpaint sketch`, enable click selection and click
+the original image to create or edit the mask directly on the built-in Forge canvas.
 
 Unlike Segment Anything based tools, this extension does not download a model, load a
 checkpoint, or send the image through Python. The selection runs in the browser and
@@ -87,12 +87,15 @@ normally.
 
 `Grow pixels`: expands the selected area before writing the mask.
 
-`Mode`: how the new selection combines with the current mask.
+`Mode`: how the new selection combines with the current mask. Shift+click always
+adds and Alt+click always subtracts.
 
 `Contiguous`: when enabled, only connected pixels around the click are selected.
 When disabled, all matching pixels in the image are selected.
 
 `Clear mask`: removes the current inpaint mask.
+
+Every wand click, Clear, and Invert is one undo step on the canvas (`Ctrl + Z`).
 
 `Invert mask`: flips the current inpaint mask.
 

@@ -2,7 +2,8 @@
     "use strict";
 
     const PANEL_ID = "inpaint_magic_wand_panel";
-    const INPAINT_CANVAS_ELEM_ID = "img2maskimg";
+    // img2img -> Inpaint (mask) and img2img -> Inpaint sketch (colored mask)
+    const CANVAS_ELEM_IDS = ["img2maskimg", "inpaint_sketch"];
 
     function app() {
         if (typeof gradioApp === "function") return gradioApp();
@@ -60,8 +61,8 @@
         textarea.dispatchEvent(event);
     }
 
-    function getInpaintForgeCanvas() {
-        const block = byId(INPAINT_CANVAS_ELEM_ID);
+    function getForgeCanvas(elemId) {
+        const block = byId(elemId);
         if (!block) return null;
 
         const container = block.querySelector(".forge-container[id^='container_']");
@@ -76,7 +77,21 @@
 
         if (!image || !drawingCanvas || !foreground) return null;
 
-        return { uuid, container, image, drawingCanvas, foreground };
+        // ForgeCanvas builds that register themselves expose saveState() (undo
+        // history + Gradio sync) and the brush color; older builds fall back to
+        // writing the foreground textarea directly.
+        const instance = (window.forgeCanvasInstances || {})[uuid] || null;
+
+        return { elemId, uuid, container, image, drawingCanvas, foreground, instance };
+    }
+
+    function getForgeCanvases() {
+        return CANVAS_ELEM_IDS.map(getForgeCanvas).filter(Boolean);
+    }
+
+    function getVisibleForgeCanvas() {
+        const canvases = getForgeCanvases();
+        return canvases.find((info) => info.container.offsetParent !== null) || canvases[0] || null;
     }
 
     function syncToolbarButton(info) {
@@ -98,8 +113,7 @@
             setStatus(enabled ? "Magic wand on" : "Magic wand off", enabled ? "ok" : "");
         }
 
-        const info = getInpaintForgeCanvas();
-        if (info) syncToolbarButton(info);
+        getForgeCanvases().forEach(syncToolbarButton);
     }
 
     function toggleMagicWandFromToolbar(event) {
@@ -256,85 +270,104 @@
         return source;
     }
 
-    function maskDataUrl(info, selection, mode) {
-        const width = info.drawingCanvas.width;
-        const height = info.drawingCanvas.height;
-        const currentCtx = info.drawingCanvas.getContext("2d", {
-            willReadFrequently: true,
-        });
-        const current = currentCtx.getImageData(0, 0, width, height).data;
-        const outCanvas = document.createElement("canvas");
-        outCanvas.width = width;
-        outCanvas.height = height;
-        const outCtx = outCanvas.getContext("2d");
-        const out = outCtx.createImageData(width, height);
-
-        for (let pixel = 0; pixel < selection.length; pixel++) {
-            const offset = pixel * 4;
-            const oldAlpha = current[offset + 3];
-            const selected = selection[pixel] ? 255 : 0;
-            let alpha = selected;
-
-            if (mode === "add") {
-                alpha = Math.max(oldAlpha, selected);
-            } else if (mode === "subtract") {
-                alpha = selected ? 0 : oldAlpha;
-            } else if (mode === "intersect") {
-                alpha = oldAlpha && selected ? oldAlpha : 0;
-            }
-
-            out.data[offset] = 255;
-            out.data[offset + 1] = 255;
-            out.data[offset + 2] = 255;
-            out.data[offset + 3] = alpha;
-        }
-
-        outCtx.putImageData(out, 0, 0);
-        return outCanvas.toDataURL("image/png");
-    }
-
-    function transparentMaskDataUrl(width, height) {
+    function selectionCanvas(selection, width, height) {
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
-        return canvas.toDataURL("image/png");
-    }
+        const ctx = canvas.getContext("2d");
+        const out = ctx.createImageData(width, height);
 
-    function invertMaskDataUrl(info) {
-        const width = info.drawingCanvas.width;
-        const height = info.drawingCanvas.height;
-        const currentCtx = info.drawingCanvas.getContext("2d", {
-            willReadFrequently: true,
-        });
-        const current = currentCtx.getImageData(0, 0, width, height).data;
-        const outCanvas = document.createElement("canvas");
-        outCanvas.width = width;
-        outCanvas.height = height;
-        const outCtx = outCanvas.getContext("2d");
-        const out = outCtx.createImageData(width, height);
-
-        for (let pixel = 0; pixel < width * height; pixel++) {
+        for (let pixel = 0; pixel < selection.length; pixel++) {
+            if (!selection[pixel]) continue;
             const offset = pixel * 4;
-            const alpha = current[offset + 3] > 128 ? 0 : 255;
             out.data[offset] = 255;
             out.data[offset + 1] = 255;
             out.data[offset + 2] = 255;
-            out.data[offset + 3] = alpha;
+            out.data[offset + 3] = 255;
         }
 
-        outCtx.putImageData(out, 0, 0);
-        return outCanvas.toDataURL("image/png");
+        ctx.putImageData(out, 0, 0);
+        return canvas;
     }
 
-    function writeForeground(info, dataUrl) {
-        const image = new Image();
-        image.onload = () => {
-            const ctx = info.drawingCanvas.getContext("2d");
-            ctx.clearRect(0, 0, info.drawingCanvas.width, info.drawingCanvas.height);
-            ctx.drawImage(image, 0, 0);
-        };
-        image.src = dataUrl;
-        setTextareaValue(info.foreground, dataUrl);
+    // Paint the selection in the canvas's own brush style, so an Inpaint
+    // sketch selection gets the sketch color and a high-contrast inpaint mask
+    // gets the checker pattern, exactly like a brush stroke would.
+    function paintSelection(info, maskCanvas) {
+        const canvas = document.createElement("canvas");
+        canvas.width = maskCanvas.width;
+        canvas.height = maskCanvas.height;
+        const ctx = canvas.getContext("2d");
+        const instance = info.instance;
+
+        ctx.drawImage(maskCanvas, 0, 0);
+        ctx.globalCompositeOperation = "source-in";
+        if (instance && instance.contrast_scribbles && instance.contrast_pattern) {
+            ctx.fillStyle = instance.contrast_pattern;
+        } else {
+            ctx.fillStyle = (instance && instance.scribbleColor) || "#ffffff";
+        }
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        return canvas;
+    }
+
+    function applySelection(info, selection, mode) {
+        const width = info.drawingCanvas.width;
+        const height = info.drawingCanvas.height;
+        const maskCanvas = selectionCanvas(selection, width, height);
+        const ctx = info.drawingCanvas.getContext("2d");
+
+        // save/restore keeps an eraser extension's composite mode intact
+        ctx.save();
+        ctx.globalAlpha = 1.0;
+        if (mode === "subtract") {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.drawImage(maskCanvas, 0, 0);
+        } else if (mode === "intersect") {
+            ctx.globalCompositeOperation = "destination-in";
+            ctx.drawImage(maskCanvas, 0, 0);
+        } else {
+            if (mode !== "add") ctx.clearRect(0, 0, width, height);
+            ctx.globalCompositeOperation = "source-over";
+            ctx.drawImage(paintSelection(info, maskCanvas), 0, 0);
+        }
+        ctx.restore();
+
+        commitDrawing(info);
+    }
+
+    function clearDrawing(info) {
+        const ctx = info.drawingCanvas.getContext("2d");
+        ctx.clearRect(0, 0, info.drawingCanvas.width, info.drawingCanvas.height);
+        commitDrawing(info);
+    }
+
+    function invertDrawing(info) {
+        const width = info.drawingCanvas.width;
+        const height = info.drawingCanvas.height;
+        const ctx = info.drawingCanvas.getContext("2d", { willReadFrequently: true });
+        const current = ctx.getImageData(0, 0, width, height).data;
+        const inverted = new Uint8Array(width * height);
+
+        for (let pixel = 0; pixel < inverted.length; pixel++) {
+            inverted[pixel] = current[pixel * 4 + 3] > 128 ? 0 : 255;
+        }
+
+        applySelection(info, inverted, "replace");
+    }
+
+    // Push an undo step and sync the Gradio foreground in one go. Without the
+    // ForgeCanvas instance, fall back to writing the textarea directly.
+    function commitDrawing(info) {
+        const instance = info.instance;
+        if (instance && instance.scribbleAlphaFixed && !instance.contrast_scribbles) {
+            info.drawingCanvas.style.opacity = instance.scribbleAlpha / 100.0;
+        }
+        if (instance && typeof instance.saveState === "function") {
+            instance.saveState();
+            return;
+        }
+        setTextareaValue(info.foreground, info.drawingCanvas.toDataURL("image/png"));
     }
 
     function clickToImagePixel(info, event) {
@@ -351,12 +384,18 @@
         return { x, y };
     }
 
-    function runSelection(event) {
+    // Shift+click adds and Alt+click subtracts, like Photoshop's wand.
+    function selectionMode(cfg, event) {
+        if (event.altKey) return "subtract";
+        if (event.shiftKey) return "add";
+        return cfg.mode;
+    }
+
+    function runSelection(info, event) {
         const cfg = config();
         if (!cfg.enabled || event.button !== 0) return;
 
-        const info = getInpaintForgeCanvas();
-        if (!info || !info.image.src) {
+        if (!info.image.src || !info.image.naturalWidth) {
             setStatus("No inpaint image", "warn");
             return;
         }
@@ -366,6 +405,8 @@
 
         event.preventDefault();
         event.stopImmediatePropagation();
+        // The canvas saves an undo step on pointerup; commitDrawing already did.
+        info.swallowPointerUp = true;
 
         try {
             const width = info.drawingCanvas.width;
@@ -375,9 +416,8 @@
                 ? floodSelection(pixels, width, height, point.x, point.y, cfg.tolerance)
                 : globalSelection(pixels, width, height, point.x, point.y, cfg.tolerance);
             const grown = growSelection(result.selected, width, height, cfg.grow);
-            const dataUrl = maskDataUrl(info, grown, cfg.mode);
 
-            writeForeground(info, dataUrl);
+            applySelection(info, grown, selectionMode(cfg, event));
             setStatus(`${result.count.toLocaleString()} pixels`, result.count ? "ok" : "warn");
         } catch (error) {
             console.error("Magic Wand Integrated failed", error);
@@ -385,30 +425,33 @@
         }
     }
 
+    function swallowPointerUp(info, event) {
+        if (!info.swallowPointerUp) return;
+        info.swallowPointerUp = false;
+        event.stopImmediatePropagation();
+    }
+
     function clearMask() {
-        const info = getInpaintForgeCanvas();
+        const info = getVisibleForgeCanvas();
         if (!info) {
             setStatus("No inpaint canvas", "warn");
             return;
         }
-        writeForeground(info, transparentMaskDataUrl(info.drawingCanvas.width, info.drawingCanvas.height));
+        clearDrawing(info);
         setStatus("Mask cleared", "ok");
     }
 
     function invertMask() {
-        const info = getInpaintForgeCanvas();
+        const info = getVisibleForgeCanvas();
         if (!info || !info.image.src) {
             setStatus("No inpaint image", "warn");
             return;
         }
-        writeForeground(info, invertMaskDataUrl(info));
+        invertDrawing(info);
         setStatus("Mask inverted", "ok");
     }
 
-    function attachCanvas() {
-        const info = getInpaintForgeCanvas();
-        if (!info) return;
-
+    function attachCanvas(info) {
         attachToolbarButton(info);
 
         if (info.drawingCanvas.dataset.imwAttached === "true") {
@@ -416,7 +459,8 @@
             return;
         }
 
-        info.drawingCanvas.addEventListener("pointerdown", runSelection, true);
+        info.drawingCanvas.addEventListener("pointerdown", (event) => runSelection(info, event), true);
+        info.drawingCanvas.addEventListener("pointerup", (event) => swallowPointerUp(info, event), true);
         info.drawingCanvas.dataset.imwAttached = "true";
     }
 
@@ -446,8 +490,7 @@
         if (enabled) {
             enabled.addEventListener("change", () => {
                 setStatus(enabled.checked ? "Click inpaint image" : "Idle", enabled.checked ? "ok" : "");
-                const info = getInpaintForgeCanvas();
-                if (info) syncToolbarButton(info);
+                getForgeCanvases().forEach(syncToolbarButton);
             });
         }
         if (clear) clear.addEventListener("click", clearMask);
@@ -458,7 +501,7 @@
 
     function setup() {
         attachPanel();
-        attachCanvas();
+        getForgeCanvases().forEach(attachCanvas);
     }
 
     if (typeof onUiLoaded === "function") onUiLoaded(setup);
