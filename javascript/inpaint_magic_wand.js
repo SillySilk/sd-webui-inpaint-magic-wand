@@ -77,12 +77,15 @@
 
         if (!image || !drawingCanvas || !foreground) return null;
 
-        // ForgeCanvas builds that register themselves expose saveState() (undo
-        // history + Gradio sync) and the brush color; older builds fall back to
-        // writing the foreground textarea directly.
-        const instance = (window.forgeCanvasInstances || {})[uuid] || null;
+        return { elemId, uuid, container, image, drawingCanvas, foreground };
+    }
 
-        return { elemId, uuid, container, image, drawingCanvas, foreground, instance };
+    // ForgeCanvas builds that register themselves expose saveState() (undo
+    // history + Gradio sync) and the brush color; older builds fall back to
+    // writing the foreground textarea directly. Looked up on every use because
+    // the instances are created after this script first attaches.
+    function canvasInstance(info) {
+        return (window.forgeCanvasInstances || {})[info.uuid] || null;
     }
 
     function getForgeCanvases() {
@@ -298,7 +301,7 @@
         canvas.width = maskCanvas.width;
         canvas.height = maskCanvas.height;
         const ctx = canvas.getContext("2d");
-        const instance = info.instance;
+        const instance = canvasInstance(info);
 
         ctx.drawImage(maskCanvas, 0, 0);
         ctx.globalCompositeOperation = "source-in";
@@ -359,7 +362,7 @@
     // Push an undo step and sync the Gradio foreground in one go. Without the
     // ForgeCanvas instance, fall back to writing the textarea directly.
     function commitDrawing(info) {
-        const instance = info.instance;
+        const instance = canvasInstance(info);
         if (instance && instance.scribbleAlphaFixed && !instance.contrast_scribbles) {
             info.drawingCanvas.style.opacity = instance.scribbleAlpha / 100.0;
         }
