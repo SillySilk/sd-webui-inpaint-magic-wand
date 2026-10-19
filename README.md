@@ -82,8 +82,8 @@ Then restart the WebUI or reload the UI.
    - **Whole person, quickest:** tick `Rectangle` and drag a box around them. If the cut
      keeps a bit of background, Alt-drag over it inside the box. If it misses part of the
      person, drag over that part (no modifier). Each refinement recomputes the same box.
-   - **Brush:** drag over part of the subject. Shift-drag over the next part to add it.
-     Alt-drag to take a part away. The brush uses Forge's `Brush Width`; keep the stroke
+   - **Brush:** drag over part of the subject. Each stroke adds to the selection (the
+     default Mode is Add). Alt-drag to take a part away. The brush uses Forge's `Brush Width`; keep the stroke
      inside the subject, because whatever it touches counts as "subject".
 4. Click the wand button again to get Forge's brush back for touch-ups.
 5. Generate with Forge's normal inpaint controls.
@@ -99,13 +99,15 @@ The mask is the same mask Forge uses for inpainting, so `Mask blur`, `Mask mode`
 follows edges (box). 40 is the default. Raise it to 50-60 when a brush stroke stops short
 on shaded clothing; lower it when the selection spills into the background.
 
-`Mode`: how a new selection combines with the mask: Replace, Add, Subtract or Intersect.
-Shift always adds and Alt always subtracts for that stroke or box.
+`Mode`: how a new selection combines with the mask: Add (the default), Replace, Subtract
+or Intersect. Shift always adds and Alt always subtracts for that stroke or box.
 
 `Rectangle`: off = brush, on = box. A box's refinement strokes work until a new box,
 unticking `Rectangle`, `Clear`, `Invert`, a new picture, turning the wand off, Forge's
 undo or redo, or any other edit that changes Forge's undo history (such as a brush stroke).
-After that, a drag inside the old box starts a new box.
+After that, a drag inside the old box starts a new box. A drag that starts inside (or within
+a brush width of) the current box refines it; to draw a new box, start outside the current
+one, or untick and re-tick `Rectangle`.
 
 `Grow`: expands the selection by this many pixels before it is written to the mask.
 
@@ -146,8 +148,9 @@ If dragging paints with Forge's brush, the wand is off. Click the wand button.
 
 If the strip says `No image`, load an image into the canvas first.
 
-If the strip says `Box expired, draw a new one`, the mask changed since the box (an
-undo, Invert, or another tool). Drag a new box.
+After an undo or any other edit, a drag inside the old box simply draws a new box. The
+`Box expired, draw a new one` message only appears if the edit happens while a refinement
+is still computing; drag a new box.
 
 ## Development
 

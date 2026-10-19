@@ -61,7 +61,7 @@ Suggested post:
 
 ```text
 Extension: Inpaint Magic Wand
-URL: https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand
+URL: https://github.com/SillySilk/sd-webui-inpaint-magic-wand
 Desc: Lightweight magic-wand selector for Forge / Neo Forge img2img inpaint masks. No model downloads, no extra tab, writes directly into the native inpaint canvas.
 ```
 
