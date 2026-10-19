@@ -1,91 +1,110 @@
-.imw-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.65rem;
-    padding: 0.25rem 0;
-}
-
-.imw-panel label {
-    align-items: center;
-    display: flex;
-    gap: 0.45rem;
-    min-width: 0;
-}
-
-.imw-row,
-.imw-grid {
-    align-items: center;
-    display: flex;
-    gap: 0.75rem;
-}
-
-.imw-row-top {
-    flex-wrap: wrap;
-}
-
-.imw-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.imw-grid label {
-    display: grid;
-    grid-template-columns: 88px minmax(90px, 1fr) 36px;
-}
-
-.imw-check {
-    white-space: nowrap;
-}
-
-.imw-panel select,
-.imw-panel button {
-    background: var(--button-secondary-background-fill);
-    border: 1px solid var(--button-secondary-border-color);
-    border-radius: 6px;
-    color: var(--body-text-color);
-    min-height: 2rem;
-    padding: 0 0.6rem;
-}
-
-.imw-panel button:hover {
-    background: var(--button-secondary-background-fill-hover);
-}
-
+/* Wand toggle in the ForgeCanvas toolbar */
 .imw-toolbar-wand {
     font-weight: 700;
 }
 
-.imw-toolbar-wand-active {
-    background-color: var(--button-primary-background-fill, #2563eb) !important;
-    color: var(--button-primary-text-color, #ffffff) !important;
+.forge-toolbar .forge-btn.imw-toolbar-wand-active,
+.forge-toolbar-static .forge-btn.imw-toolbar-wand-active {
+    background-color: #f08a24 !important;
+    color: #111111 !important;
 }
 
-.imw-actions {
+/* Floating settings strip, bottom centre of the canvas while the wand is on. Forge's two-row
+   toolbar already covers the top; under it, the strip hid the subject's head in a 512 px canvas. */
+.imw-strip {
+    align-items: center;
+    background: rgba(20, 20, 24, 0.92);
+    border: 1px solid #555555;
+    border-radius: 8px;
+    bottom: 6px;
+    color: #dddddd;
+    display: flex;
     flex-wrap: wrap;
+    font: 12px system-ui, sans-serif;
+    gap: 8px;
+    justify-content: center;
+    left: 50%;
+    max-width: calc(100% - 16px);
+    padding: 6px 10px;
+    position: absolute;
+    transform: translateX(-50%);
+    width: max-content; /* with left: 50% alone it only gets half the room and wraps to two rows */
+    user-select: none;
+    z-index: 11;
 }
 
-#imw_status {
-    color: var(--body-text-color-subdued);
-    min-width: 8rem;
+.imw-strip[hidden] {
+    display: none;
 }
 
-#imw_status[data-kind="ok"] {
-    color: var(--button-primary-background-fill, #2b8a3e);
+.imw-strip label {
+    align-items: center;
+    display: flex;
+    gap: 4px;
+    white-space: nowrap;
 }
 
-#imw_status[data-kind="warn"],
-#imw_status[data-kind="error"] {
-    color: var(--error-text-color, #b91c1c);
+.imw-strip select,
+.imw-strip input[type="number"],
+.imw-strip button {
+    background: #3a3a40;
+    border: 1px solid #555555;
+    border-radius: 5px;
+    color: #eeeeee;
+    font: inherit;
+    height: 24px;
+    padding: 0 6px;
 }
 
-@media (max-width: 700px) {
-    .imw-row,
-    .imw-grid {
-        align-items: stretch;
-        flex-direction: column;
-    }
+.imw-strip input[type="number"] {
+    width: 3.5em;
+}
 
-    .imw-grid label {
-        grid-template-columns: 84px minmax(90px, 1fr) 34px;
-    }
+.imw-strip input[type="checkbox"] {
+    accent-color: #f08a24;
+    margin: 0;
+}
+
+.imw-strip button {
+    cursor: pointer;
+}
+
+.imw-strip button:hover {
+    background: #4a4a52;
+}
+
+.imw-status {
+    color: #aaaaaa;
+    min-width: 6em;
+}
+
+.imw-status[data-kind="ok"] {
+    color: #8fd18f;
+}
+
+.imw-status[data-kind="busy"] {
+    color: #f0b070;
+}
+
+.imw-status[data-kind="warn"],
+.imw-status[data-kind="error"] {
+    color: #ff8a80;
+}
+
+/* Drag overlay: brush path or box outline, laid over the drawing canvas */
+.imw-overlay {
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+}
+
+/* While the wand is on: crosshair, and no brush-size circle in box mode or mid-drag */
+.imw-on .forge-drawing-canvas {
+    cursor: crosshair;
+}
+
+.imw-on.imw-rect .forge-scribble-indicator,
+.imw-stroking .forge-scribble-indicator {
+    display: none !important;
 }

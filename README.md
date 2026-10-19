@@ -1,16 +1,14 @@
 # Inpaint Magic Wand
 
-A lightweight magic-wand mask selector for Stable Diffusion WebUI Forge / Neo Forge.
+A lightweight selection tool for the Stable Diffusion WebUI Forge / Neo Forge inpaint canvas.
 
-<img width="894" height="172" alt="image" src="https://github.com/user-attachments/assets/0f064c19-cebc-4226-9d3e-ca6bb5ad54da" />
-
-This extension adds a `Magic Wand Integrated` accordion to the `img2img` page. In
-`img2img -> Inpaint` or `img2img -> Inpaint sketch`, enable click selection and click
-the original image to create or edit the mask directly on the built-in Forge canvas.
+Turn on the wand in the canvas toolbar, then either brush over a person or object or drag a
+box around it. The selection follows the subject's edges and lands in Forge's own inpaint
+mask, as one undo step.
 
 Unlike Segment Anything based tools, this extension does not download a model, load a
 checkpoint, or send the image through Python. The selection runs in the browser and
-writes the result into Forge's existing inpaint mask layer.
+writes the result into Forge's existing mask layer.
 
 ## Origin
 
@@ -22,25 +20,28 @@ from Anthropic and OpenAI.
 
 ## Features
 
-- Integrated into the normal `img2img` workflow.
-- Uses the existing `img2img -> Inpaint` image and mask canvas.
-- Replace, add, subtract, and intersect selection modes.
-- Contiguous or global color selection.
-- Adjustable tolerance and mask growth.
-- Clear and invert mask actions.
-- In-canvas toolbar toggle next to `Center Position [R]`.
-- No Python package dependencies.
-- No model downloads.
-- No extra tabs.
+- A wand button in the inpaint canvas toolbar, next to `Center Position [R]`.
+- **Brush**: drag over the subject and the selection spreads out to its edges.
+- **Rectangle**: drag a box around the subject and it is cut out of the background
+  (GrabCut-style). Brush strokes inside the box then refine that cut.
+- Shift adds and Alt subtracts for a single stroke or box, whatever the Mode says.
+- Replace, Add, Subtract and Intersect modes, Tolerance, Grow, Clear and Invert.
+- Works on `img2img -> Inpaint` and `img2img -> Inpaint sketch` (the sketch gets the
+  current sketch colour).
+- Every stroke, box, refinement, Clear and Invert is one Forge undo step.
+- No Python package dependencies, no model downloads, no extra tabs.
 
 ## Compatibility
 
 Tested with Stable Diffusion WebUI Forge - Neo / Neo Forge using Gradio 4 and
-Forge's `ForgeCanvas` inpaint UI.
+Forge's `ForgeCanvas` inpaint UI, in Chrome.
 
 This is not a stock AUTOMATIC1111 canvas extension. It depends on Forge's
-`img2maskimg` / `ForgeCanvas` DOM structure. If another WebUI does not expose that
-canvas, the accordion may appear but click selection will not work.
+`img2maskimg` / `inpaint_sketch` `ForgeCanvas` DOM structure. Without that canvas the
+wand button does not appear.
+
+Works alongside the ForgeUI-MaskEraser extension: while the wand is on and the pointer
+is over its canvas, Shift goes to the wand instead of switching the eraser on.
 
 ## Installation
 
@@ -51,7 +52,7 @@ canvas, the accordion may appear but click selection will not work.
 3. Enter this repository URL:
 
    ```text
-   https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git
+   https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git
    ```
 
 4. Click `Install`.
@@ -62,66 +63,97 @@ canvas, the accordion may appear but click selection will not work.
 Clone the repository into your WebUI `extensions` folder:
 
 ```bash
-git clone https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git extensions/sd-webui-inpaint-magic-wand
+git clone https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git extensions/sd-webui-inpaint-magic-wand
 ```
 
 Then restart the WebUI or reload the UI.
 
 ## Usage
 
-1. Open `img2img`.
-2. Open the `Inpaint` image mode.
-3. Upload or paste an image.
-4. Open `Magic Wand Integrated`.
-5. Enable `Enable click selection`, or use the `W` toolbar button beside `Center Position [R]` in the image frame.
-6. Click the source image to create a mask.
-7. Generate with Forge's normal inpaint controls.
+1. Open `img2img`, then `Inpaint` (or `Inpaint sketch`), and load an image.
+2. Click the wand button in the canvas toolbar. It turns orange, and a settings strip
+   appears at the bottom of the canvas. Forge's brush is paused while the wand is on.
+3. Select the subject:
+   - **Whole person, quickest:** tick `Rectangle` and drag a box around them. If the cut
+     keeps a bit of background, Alt-drag over it inside the box. If it misses part of the
+     person, drag over that part (no modifier). Each refinement recomputes the same box.
+   - **Brush:** drag over part of the subject. Each stroke adds to the selection (the
+     default Mode is Add). Alt-drag to take a part away. The brush uses Forge's `Brush Width`; keep the stroke
+     inside the subject, because whatever it touches counts as "subject".
+4. Click the wand button again to get Forge's brush back for touch-ups.
+5. Generate with Forge's normal inpaint controls.
 
-The generated mask is the same mask Forge uses for inpainting, so `Mask blur`,
-`Mask mode`, `Masked content`, `Inpaint area`, and `Only masked padding` still work
-normally.
+Right-drag still pans and the wheel still zooms while the wand is on.
+
+The mask is the same mask Forge uses for inpainting, so `Mask blur`, `Mask mode`,
+`Masked content`, `Inpaint area` and `Only masked padding` still work normally.
 
 ## Controls
 
-`Tolerance`: how far a pixel color may be from the clicked color.
+`Tolerance`: how readily the selection crosses soft edges (brush) or how strictly the cut
+follows edges (box). 40 is the default. Raise it to 50-60 when a brush stroke stops short
+on shaded clothing; lower it when the selection spills into the background.
 
-`Grow pixels`: expands the selected area before writing the mask.
+`Mode`: how a new selection combines with the mask: Add (the default), Replace, Subtract
+or Intersect. Shift always adds and Alt always subtracts for that stroke or box.
 
-`Mode`: how the new selection combines with the current mask. Shift+click always
-adds and Alt+click always subtracts.
+`Rectangle`: off = brush, on = box. A box's refinement strokes work until a new box,
+unticking `Rectangle`, `Clear`, `Invert`, a new picture, turning the wand off, Forge's
+undo or redo, or any other edit that changes Forge's undo history (such as a brush stroke).
+After that, a drag inside the old box starts a new box. A drag that starts inside (or within
+a brush width of) the current box refines it; to draw a new box, start outside the current
+one, or untick and re-tick `Rectangle`.
 
-`Contiguous`: when enabled, only connected pixels around the click are selected.
-When disabled, all matching pixels in the image are selected.
+`Grow`: expands the selection by this many pixels before it is written to the mask.
 
-`Clear mask`: removes the current inpaint mask.
+`Clear`: removes the current mask. `Invert`: flips it.
 
-Every wand click, Clear, and Invert is one undo step on the canvas (`Ctrl + Z`).
+Undo (`Ctrl + Z` or Forge's undo button) steps back one stroke, box or refinement at a time.
 
-`Invert mask`: flips the current inpaint mask.
+## Tips and limits
 
-`W` toolbar button: toggles Magic Wand on/off from the inpaint image frame, without scrolling back to the accordion.
+- The box is the most reliable way to get a whole person. Brush strokes work best on
+  areas that differ from their surroundings, such as a shirt against a wall.
+- When part of the subject is the same colour as the background next to it (dark
+  trousers against a black wall, two people in matching dark suits), the brush cannot
+  tell them apart. Use a box, then Alt-drag over the part that does not belong.
+- Two people touching: box the one you want, then Alt-drag along the other person where
+  they overlap (an arm across the chest, a shoulder).
+- Forge's toolbar covers the top of the canvas and the strip covers the bottom. To work
+  there, zoom with the wheel and pan with right-drag, or start a box from the bottom
+  corner and drag upwards.
+- Speed: on a 2 MP image a box takes about 1 s; on a 4K image about 1 s for a box and
+  under 1.5 s for a refinement.
 
 ## How It Differs From SAM Extensions
 
-Segment Anything extensions are semantic/object segmentation tools. They are more
-powerful for object selection, but need model files, server-side inference, and often
-a separate mask-transfer workflow.
+Segment Anything extensions are semantic/object segmentation tools. They understand
+objects, but need model files, server-side inference, and often a separate
+mask-transfer workflow.
 
-Inpaint Magic Wand is a small canvas tool. It is closer to the color-selection wand
-in an image editor. It is fast, dependency-free, and designed to stay inside the
-native Forge inpaint panel.
+Inpaint Magic Wand works from colour and edges only, in the browser. It is fast,
+dependency-free, and stays inside the native Forge inpaint panel.
 
 ## Troubleshooting
 
-If the accordion does not appear, restart the WebUI after installation.
+If the wand button does not appear, restart the WebUI after installation, then
+hard-refresh the browser so the new JavaScript loads.
 
-If clicks still draw with the brush, make sure `Enable click selection` is checked.
+If dragging paints with Forge's brush, the wand is off. Click the wand button.
 
-If the status says `No inpaint image`, switch to `img2img -> Inpaint` and upload an
-image there.
+If the strip says `No image`, load an image into the canvas first.
 
-If the panel appears after an update but clicks do nothing, hard-refresh the browser
-or reload the UI so the JavaScript is reloaded.
+After an undo or any other edit, a drag inside the old box simply draws a new box. The
+`Box expired, draw a new one` message only appears if the edit happens while a refinement
+is still computing; drag a new box.
+
+## Development
+
+The tests run with Node's built-in runner and need no packages:
+
+```bash
+node --test "tests/js/*.test.js"
+```
 
 ## License
 

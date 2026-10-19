@@ -23,14 +23,13 @@
 After pushing, install from the WebUI with:
 
 ```text
-https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git
+https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git
 ```
 
 Restart the WebUI and check:
 
-- `Magic Wand Integrated` appears in `img2img`.
-- It does not appear in `txt2img`.
-- Click selection works in `img2img -> Inpaint`.
+- The wand button appears in the `img2img -> Inpaint` canvas toolbar.
+- Brush and box selection work in `img2img -> Inpaint`.
 
 ## Submit To The A1111 Extension Index
 
@@ -58,7 +57,7 @@ Suggested post:
 
 ```text
 Extension: Inpaint Magic Wand
-URL: https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand
+URL: https://github.com/SillySilk/sd-webui-inpaint-magic-wand
 Desc: Lightweight magic-wand selector for Forge / Neo Forge img2img inpaint masks. No model downloads, no extra tab, writes directly into the native inpaint canvas.
 ```
 
