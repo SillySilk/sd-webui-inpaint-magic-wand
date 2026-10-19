@@ -1,14 +1,14 @@
 "use strict";
 
 // RGBA image: `colorsInside` ([r,g,b] list) as mottled diagonal stripes inside the disk, colorOutside elsewhere.
-// colorOutside is an [r,g,b] (flat background) or a function (x, y) -> [r,g,b] (e.g. ringGradient).
-function disk(w, h, cx, cy, r, colorsInside, colorOutside) {
+// `stripe` is the stripe width in px (default 3). colorOutside is an [r,g,b] (flat background) or a function (x, y) -> [r,g,b] (e.g. ringGradient).
+function disk(w, h, cx, cy, r, colorsInside, colorOutside, stripe = 3) {
     const out = new Uint8ClampedArray(w * h * 4);
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
             const inside = (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
             const c = inside
-                ? colorsInside[(Math.floor((x + y) / 3) + (x % 5 === 0 ? 1 : 0)) % colorsInside.length]
+                ? colorsInside[(Math.floor((x + y) / stripe) + (x % 5 === 0 ? 1 : 0)) % colorsInside.length]
                 : (typeof colorOutside === "function" ? colorOutside(x, y) : colorOutside);
             const o = (y * w + x) * 4;
             out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 255;

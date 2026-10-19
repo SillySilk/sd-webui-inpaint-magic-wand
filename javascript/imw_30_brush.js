@@ -5,37 +5,50 @@
     const TOLERANCES = [10, 20, 30, 40, 50, 60, 70, 80];
     const DEFAULT_TOLERANCE = 40;
 
-    // Cost constants. Step cost into pixel q:
+    // Cost model. Step cost into pixel q:
     //     EDGE_WEIGHT * edge[q] * gate(d) + max(0, d - T) / COLOUR_DIVISOR,   T = tolerance * T_PER_TOLERANCE
-    // where d is the Lab distance (dE76) from q to the nearest seed-colour cluster and
-    //     gate(d) = clamp((d - GATE_LO*T) / ((GATE_HI - GATE_LO)*T), 0, 1).
-    // Pixels whose total path cost is <= 1 + tolerance/40 are selected.
+    //     d = max(dPixel, dLocal)
+    //     gate(d) = clamp((d - GATE_LO*T) / ((GATE_HI - GATE_LO)*T), 0, 1)
+    // dPixel: Lab distance (dE76) from q's colour to the nearest k-means cluster of the stroke's colours.
+    // dLocal: distance from q's neighbourhood colour (mean Lab over a (2*LOCAL_RADIUS+1)^2 box) to the
+    //   nearest blend of two neighbourhood-colour clusters of the stroke (segment distance; see blendDistance).
+    // Pixels whose total path cost is <= 1 + tolerance/40 are selected, then a rim of LOCAL_RADIUS px whose
+    // dPixel <= T is added back (the box straddles the outline, so dLocal stops growth a few px short), then
+    // cleanMask.
     //
-    // Final values and why (tuned on the brush tests plus a sweep of harder fixtures: a background only
-    // dE 11.5 from one stripe colour, and a disk with +-25% / +-40% brightness shading):
-    // - The brief's ungated `edge * 4` selects only the stroke itself (IoU 0.055): a multi-colour subject
-    //   is full of internal edges (the edge map is normalised to its 99th percentile, so stripe edges
-    //   read 0.4..0.9), and 80 px of them costs far more than the threshold. The gate fixes that: an
-    //   edge only costs when the pixel's colour is not already explained by the stroke's palette. An
-    //   edge between two colours the stroke covered is texture; an edge into a colour it did not cover
-    //   is a boundary.
-    // - GATE_LO/HI = 0.25/0.75 of T: below a quarter of T (noise, at tolerance 40 that is dE 5) edges
-    //   are free; from three quarters of T up they cost in full. A tighter gate (0.2/0.6) cut reach on
-    //   the shaded disk by about 0.15 IoU.
-    // - EDGE_WEIGHT = 12 (brief: 4): with the gate the edge term only acts on boundary pixels, so it
-    //   can be strong. On the near-colour background at tolerance 40, weight 4 leaked into 15% of the
-    //   image (IoU 0.63), 8 into 2%, 12 into 0% (IoU 0.99); at tolerance 50 weight 12 leaks 4%, 16 leaks
-    //   1%. The cost of a higher weight is reach on shaded subjects (+-25% shading at tolerance 40:
-    //   IoU 0.86 at weight 4, 0.79 at 12), which the user recovers with another stroke or more
-    //   tolerance. 12 is the compromise.
-    // - T_PER_TOLERANCE = 0.5, COLOUR_DIVISOR = 10, threshold 1 + tolerance/40: as in the brief. A
-    //   divisor of 5 changed nothing measurable; a smaller T (0.4) mostly cut reach. Down-weighting
-    //   lightness in d helped shading but made a lighter look-alike background leak, so plain dE76 stays.
+    // Why (measured on the brush tests plus a sweep: 3 px and 12 px stripes; flat backgrounds shifted from
+    // SKIN by dE 3.7 / 5.5 / 7.3 / 10.9 touching the disk; +-25% brightness shading):
+    // - The brief's ungated `edge * 4` selects only the stroke (IoU 0.055): a multi-colour subject is full
+    //   of internal edges (99th-percentile-normalised, stripe edges read 0.4..0.9). The gate makes an edge
+    //   cost only on pixels the stroke's palette does not explain.
+    // - Pixel colour alone cannot tell a look-alike background from the subject: a background dE 5 from
+    //   SKIN is "explained" by the skin cluster, and where it touches a skin stripe there is no edge at all
+    //   (the disk boundary's mean edge, 0.36, is weaker than the interior texture's, median 0.59). With the
+    //   pixel term only, dE <= 5.5 at tolerance 40 flooded 74% of the image. The neighbourhood term is
+    //   what separates them: inside a striped subject the neighbourhood colour is a mix of the stripes, a
+    //   flat background's is pure. Look-alike at tolerance 40 now: 3 px stripes leak 0.6-0.7% (IoU 0.97-0.98)
+    //   for dE 3.7-10.9; 12 px stripes leak 2.7 / 2.1 / 1.6 / 1.4% (IoU 0.91-0.95).
+    // - The real limit: when the subject has a large flat area of the look-alike colour (wide stripes, a
+    //   face against a skin-coloured wall), its neighbourhood colour is pure too, so only edges and the
+    //   rim separate them. Expect a few % leak at tolerance 40, more at 50 (12 px stripes, dE 3.7: 5.0%).
+    // - Blends, not just clusters, for dLocal: with 12 px stripes the stroke's neighbourhood colours run
+    //   continuously between stripe colours; nearest-cluster distance cut the flat-background IoU to 0.38.
+    // - LOCAL_RADIUS 3: 2 lost reach at tolerance 30 (IoU 0.81); 4 leaked more with 12 px stripes (3.0%
+    //   vs 2.1% at dE 5.5).
+    // - EDGE_WEIGHT 12 (brief: 4): 4 and 8 leak more with 12 px stripes at dE 5.5, tolerance 40 (3.8% /
+    //   2.7% vs 2.1%); the price is reach on shaded subjects (+-25%, tolerance 40: IoU 0.89 at 4, 0.83 at 12),
+    //   which another stroke or more tolerance recovers.
+    // - GATE_LO/HI 0.25/0.75 of T: below a quarter of T (noise; dE 5 at tolerance 40) edges are free. A
+    //   tighter gate (0.2/0.6) cut reach on the shaded disk by about 0.15 IoU.
+    // - T_PER_TOLERANCE 0.5, COLOUR_DIVISOR 10, threshold 1 + tolerance/40: as in the brief. Divisor 5
+    //   changed nothing measurable; T 0.4 mostly cut reach; down-weighting lightness helped shading but made
+    //   a lighter look-alike background leak.
     // - Diagonal steps cost sqrt(2) times a straight step so the growth is not diamond-shaped.
     const EDGE_WEIGHT = 12;
     const COLOUR_DIVISOR = 10;
     const T_PER_TOLERANCE = 0.5;
     const GATE_LO = 0.25, GATE_HI = 0.75;
+    const LOCAL_RADIUS = 3;
     const KMEANS_SAMPLE = 4000;
     const KMEANS_ITERS = 10;
 
@@ -166,6 +179,68 @@
         return p;
     };
 
+    // Mean Lab over a (2r+1)^2 box around each pixel (separable running sums, borders clamped).
+    function boxMeanLab(lab, w, h, r) {
+        const tmp = new Float32Array(lab.length), out = new Float32Array(lab.length);
+        const win = 2 * r + 1;
+        for (let y = 0; y < h; y++) {
+            for (let k = 0; k < 3; k++) {
+                let sum = 0;
+                for (let i = -r; i <= r; i++) sum += lab[(y * w + Math.min(w - 1, Math.max(0, i))) * 3 + k];
+                for (let x = 0; x < w; x++) {
+                    tmp[(y * w + x) * 3 + k] = sum / win;
+                    sum += lab[(y * w + Math.min(w - 1, x + r + 1)) * 3 + k] - lab[(y * w + Math.max(0, x - r)) * 3 + k];
+                }
+            }
+        }
+        for (let x = 0; x < w; x++) {
+            for (let k = 0; k < 3; k++) {
+                let sum = 0;
+                for (let i = -r; i <= r; i++) sum += tmp[(Math.min(h - 1, Math.max(0, i)) * w + x) * 3 + k];
+                for (let y = 0; y < h; y++) {
+                    out[(y * w + x) * 3 + k] = sum / win;
+                    sum += tmp[(Math.min(h - 1, y + r + 1) * w + x) * 3 + k] - tmp[(Math.max(0, y - r) * w + x) * 3 + k];
+                }
+            }
+        }
+        return out;
+    }
+
+    function nearestDistance(lab, q, centres) {
+        const L = lab[q * 3], A = lab[q * 3 + 1], B = lab[q * 3 + 2];
+        let bd = Infinity;
+        for (let c = 0; c < centres.length; c += 3) {
+            const d = (L - centres[c]) ** 2 + (A - centres[c + 1]) ** 2 + (B - centres[c + 2]) ** 2;
+            if (d < bd) bd = d;
+        }
+        return Math.sqrt(bd);
+    }
+
+    // Distance from pixel q's colour to the nearest point on any segment between two centres (or a centre):
+    // the colour counts as explained when it is a blend of two colours the model holds.
+    function blendDistance(lab, q, centres) {
+        const L = lab[q * 3], A = lab[q * 3 + 1], B = lab[q * 3 + 2];
+        const k = centres.length / 3;
+        let bd = Infinity;
+        for (let i = 0; i < k; i++) {
+            const ai = i * 3;
+            const d0 = (L - centres[ai]) ** 2 + (A - centres[ai + 1]) ** 2 + (B - centres[ai + 2]) ** 2;
+            if (d0 < bd) bd = d0;
+            for (let j = i + 1; j < k; j++) {
+                const bj = j * 3;
+                const ux = centres[bj] - centres[ai], uy = centres[bj + 1] - centres[ai + 1], uz = centres[bj + 2] - centres[ai + 2];
+                const uu = ux * ux + uy * uy + uz * uz;
+                if (uu < 1e-6) continue;
+                let t = ((L - centres[ai]) * ux + (A - centres[ai + 1]) * uy + (B - centres[ai + 2]) * uz) / uu;
+                if (t <= 0 || t >= 1) continue;
+                const ex = L - centres[ai] - t * ux, ey = A - centres[ai + 1] - t * uy, ez = B - centres[ai + 2] - t * uz;
+                const d = ex * ex + ey * ey + ez * ez;
+                if (d < bd) bd = d;
+            }
+        }
+        return Math.sqrt(bd);
+    }
+
     function brushSelect(work, seeds, tolerance) {
         const w = work.width, h = work.height, n = w * h, lab = work.lab, edge = work.edge;
         const seedIdx = [];
@@ -177,18 +252,16 @@
         const T = tol * T_PER_TOLERANCE;
         const accept = 1 + tol / 40;
         const centres = colourModel(lab, seedIdx);
-        const k = centres.length / 3;
+        const local = boxMeanLab(lab, w, h, LOCAL_RADIUS);
+        const localCentres = colourModel(local, seedIdx);
 
         // Per-pixel step cost into q.
         const step = new Float32Array(n);
+        const rawOk = new Uint8Array(n);
         for (let q = 0; q < n; q++) {
-            const L = lab[q * 3], A = lab[q * 3 + 1], B = lab[q * 3 + 2];
-            let bd = Infinity;
-            for (let c = 0; c < k; c++) {
-                const d = (L - centres[c * 3]) ** 2 + (A - centres[c * 3 + 1]) ** 2 + (B - centres[c * 3 + 2]) ** 2;
-                if (d < bd) bd = d;
-            }
-            const d = Math.sqrt(bd);
+            const dRaw = nearestDistance(lab, q, centres);
+            rawOk[q] = dRaw <= T ? 1 : 0;
+            const d = Math.max(dRaw, blendDistance(local, q, localCentres));
             let g = (d - T * GATE_LO) / (T * (GATE_HI - GATE_LO));
             g = g < 0 ? 0 : g > 1 ? 1 : g;
             step[q] = edge[q] * EDGE_WEIGHT * g + Math.max(0, d - T) / COLOUR_DIVISOR;
@@ -220,6 +293,11 @@
                 }
             }
         }
+        // Rim recovery: the neighbourhood term is diluted within LOCAL_RADIUS of the subject's outline (the box
+        // straddles the boundary), so the growth stops a few px short. Add back pixels within that distance of
+        // the selection whose own colour is in the palette.
+        const near = IMW.growMask(out, w, h, LOCAL_RADIUS);
+        for (let i = 0; i < n; i++) if (near[i] && rawOk[i]) out[i] = 255;
         return IMW.cleanMask(out, w, h);
     }
 

@@ -52,6 +52,35 @@ test("it does not leak through a strong edge into a similar background", () => {
     assert.ok(iou(m, inside) >= 0.9, "IoU " + iou(m, inside).toFixed(3));
 });
 
+// Flat background a few dE from SKIN, touching the disk: SKIN + 15 per channel is dE 5.5.
+const LOOKALIKE = SKIN.map((v) => v + 15);
+function leakAndIoU(m, cx, cy, r) {
+    const inside = circleMask(W, H, cx, cy, r);
+    let outside = 0;
+    for (let i = 0; i < m.length; i++) if (m[i] && !inside[i]) outside++;
+    return { leak: outside / (W * H), score: iou(m, inside) };
+}
+
+test("it does not flood a look-alike background that touches the subject", () => {
+    for (const off of [10, 15, 20]) { // dE 3.7, 5.5, 7.3
+        const wk = workOf(disk(W, H, CX, CY, R, INSIDE, SKIN.map((v) => v + off)), W, H);
+        const { leak, score } = leakAndIoU(IMW.brushSelect(wk, centreStroke(6), 40), CX, CY, R);
+        assert.ok(leak < 0.02, "+" + off + " leak " + (100 * leak).toFixed(1) + "%");
+        assert.ok(score >= 0.9, "+" + off + " IoU " + score.toFixed(3));
+    }
+});
+
+test("wide stripes: the whole disk is selected and a look-alike background leaks little", () => {
+    const flat = workOf(disk(W, H, CX, CY, R, INSIDE, GREEN, 12), W, H);
+    const a = leakAndIoU(IMW.brushSelect(flat, centreStroke(6), 40), CX, CY, R);
+    assert.ok(a.score >= 0.93, "flat IoU " + a.score.toFixed(3));
+    // Pinned limit: a flat look-alike area inside the subject removes the neighbourhood cue (measured 2.1%).
+    const look = workOf(disk(W, H, CX, CY, R, INSIDE, LOOKALIKE, 12), W, H);
+    const b = leakAndIoU(IMW.brushSelect(look, centreStroke(6), 40), CX, CY, R);
+    assert.ok(b.leak < 0.03, "look-alike leak " + (100 * b.leak).toFixed(1) + "%");
+    assert.ok(b.score >= 0.9, "look-alike IoU " + b.score.toFixed(3));
+});
+
 test("low tolerance selects less than high tolerance", () => {
     const wk = workOf(disk(W, H, CX, CY, R, INSIDE, GREEN), W, H);
     const seeds = centreStroke(6);
@@ -93,10 +122,11 @@ test("a selection at 640 px takes under 300 ms", () => {
         console.log("brushSelect 640x480 tol " + tol + ": " + ms.toFixed(1) + " ms, " + count(m) + " px");
         assert.ok(ms < 300, "tol " + tol + " took " + ms.toFixed(1) + " ms");
     }
-    // Worst case: a look-alike background, so the growth floods the whole image.
-    const flood = workOf(disk(w, h, cx, cy, r, INSIDE, [235, 190, 150]), w, h);
+    // Worst case: the stroke also covers the background, so the growth floods the whole image.
+    const flood = workOf(disk(w, h, cx, cy, r, INSIDE, GREEN), w, h);
+    const both = IMW.strokeSeeds([{ x: cx - 80, y: cy }, { x: w + 20, y: cy }], 12, w, h);
     const t0 = process.hrtime.bigint();
-    const m = IMW.brushSelect(flood, seeds, 80);
+    const m = IMW.brushSelect(flood, both, 80);
     const ms = Number(process.hrtime.bigint() - t0) / 1e6;
     console.log("brushSelect 640x480 flood tol 80: " + ms.toFixed(1) + " ms, " + count(m) + " px");
     assert.ok(ms < 300, "flood took " + ms.toFixed(1) + " ms");
