@@ -1,6 +1,7 @@
 "use strict";
 
-// RGBA image: `colorsInside` ([r,g,b] list) as mottled diagonal stripes inside the disk, flat colorOutside elsewhere.
+// RGBA image: `colorsInside` ([r,g,b] list) as mottled diagonal stripes inside the disk, colorOutside elsewhere.
+// colorOutside is an [r,g,b] (flat background) or a function (x, y) -> [r,g,b] (e.g. ringGradient).
 function disk(w, h, cx, cy, r, colorsInside, colorOutside) {
     const out = new Uint8ClampedArray(w * h * 4);
     for (let y = 0; y < h; y++) {
@@ -8,7 +9,7 @@ function disk(w, h, cx, cy, r, colorsInside, colorOutside) {
             const inside = (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
             const c = inside
                 ? colorsInside[(Math.floor((x + y) / 3) + (x % 5 === 0 ? 1 : 0)) % colorsInside.length]
-                : colorOutside;
+                : (typeof colorOutside === "function" ? colorOutside(x, y) : colorOutside);
             const o = (y * w + x) * 4;
             out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 255;
         }
@@ -50,4 +51,14 @@ function circleMask(w, h, cx, cy, r) {
     return m;
 }
 
-module.exports = { disk, noise, iou, circleMask };
+// Background colour function for disk(): equals `atEdge` on the disk boundary and blends smoothly
+// (linearly in RGB with distance from the boundary) to `atReach` at `reach` px outside it, then stays there.
+function ringGradient(cx, cy, r, atEdge, atReach, reach) {
+    return (x, y) => {
+        const d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) - r;
+        const t = Math.min(1, Math.max(0, d / reach));
+        return [0, 1, 2].map((k) => Math.round(atEdge[k] + (atReach[k] - atEdge[k]) * t));
+    };
+}
+
+module.exports = { disk, noise, iou, circleMask, ringGradient };
