@@ -16,8 +16,9 @@ The click-to-flood wand is replaced by a selection tool on the inpaint canvas.
   (GrabCut-style colour models plus a graph cut). Strokes inside the box refine the cut:
   Alt-drag marks "not subject", a plain drag marks "subject". This separates two people
   who touch.
-- Each stroke, box and refinement is one Forge undo step. An undo, Invert, Clear, a new
-  image, or turning the wand off ends the box's refinement.
+- Each stroke, box and refinement is one Forge undo step. A box's refinement ends with a
+  new box, unticking `Rectangle`, Clear, Invert, a new picture, turning the wand off,
+  Forge's undo or redo, or any other edit that changes Forge's undo history.
 - The selection is cleaned (no pinholes or specks), smoothed, then grown by `Grow`.
 - The brush size comes from Forge's `Brush Width`.
 - Shift adds and Alt subtracts for one stroke or box. While the wand is on, Shift no longer

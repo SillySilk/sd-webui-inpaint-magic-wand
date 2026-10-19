@@ -45,6 +45,10 @@ is over its canvas, Shift goes to the wand instead of switching the eraser on.
 
 ## Installation
 
+Until it is merged into `main`, the canvas wand tool lives on the `canvas-wand` branch.
+Installing from the URL alone takes the default branch (`main`), which still has the old
+click wand, so name the branch as shown below.
+
 ### From the WebUI
 
 1. Open the `Extensions` tab.
@@ -52,18 +56,19 @@ is over its canvas, Shift goes to the wand instead of switching the eraser on.
 3. Enter this repository URL:
 
    ```text
-   https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git
+   https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git
    ```
 
-4. Click `Install`.
-5. Restart the WebUI or reload the UI.
+4. In `Specific branch name`, enter `canvas-wand` (leave it empty once the tool is on `main`).
+5. Click `Install`.
+6. Restart the WebUI or reload the UI.
 
 ### Manual Install
 
 Clone the repository into your WebUI `extensions` folder:
 
 ```bash
-git clone https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git extensions/sd-webui-inpaint-magic-wand
+git clone -b canvas-wand https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git extensions/sd-webui-inpaint-magic-wand
 ```
 
 Then restart the WebUI or reload the UI.
@@ -97,9 +102,10 @@ on shaded clothing; lower it when the selection spills into the background.
 `Mode`: how a new selection combines with the mask: Replace, Add, Subtract or Intersect.
 Shift always adds and Alt always subtracts for that stroke or box.
 
-`Rectangle`: off = brush, on = box. A box's refinement strokes work until the next box,
-`Clear`, unticking `Rectangle`, turning the wand off, an undo, or a new image. After that,
-a drag inside the old box starts a new box.
+`Rectangle`: off = brush, on = box. A box's refinement strokes work until a new box,
+unticking `Rectangle`, `Clear`, `Invert`, a new picture, turning the wand off, Forge's
+undo or redo, or any other edit that changes Forge's undo history (such as a brush stroke).
+After that, a drag inside the old box starts a new box.
 
 `Grow`: expands the selection by this many pixels before it is written to the mask.
 
