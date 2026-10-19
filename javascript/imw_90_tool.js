@@ -305,6 +305,7 @@
         const cache = st.workCache;
         if (cache && cache.src === st.info.image.src) return;
         st.workCache = null;
+        st.gen++; // a stroke still computing belongs to the old picture
         endSession(st);
         if (st.on) prebuildWork(st);
     }
@@ -313,6 +314,25 @@
 
     function endSession(st) {
         st.session = null;
+    }
+
+    // The ForgeCanvas undo-history head (the snapshot saveState pushed last), or undefined when
+    // the instance keeps no history. Any edit after the wand's own commit (Invert, Ctrl+X reset,
+    // loadDrawing, undo/redo, another extension) moves the head, so the session can tell it is stale.
+    function historyHead(st) {
+        const instance = canvasInstance(st.info);
+        if (!instance || !Array.isArray(instance.history)) return undefined;
+        return instance.history[instance.historyIndex];
+    }
+
+    // A session is only refinable while the canvas still holds exactly what the wand last committed.
+    function sessionValid(st) {
+        const session = st.session, c = st.info.drawingCanvas;
+        if (!session) return false;
+        const cache = st.workCache;
+        if (!cache || cache.work !== session.work || cache.src !== st.info.image.src) return false;
+        if (session.before.width !== c.width || session.before.height !== c.height) return false;
+        return historyHead(st) === session.head;
     }
 
     function endAllSessions() {
@@ -409,11 +429,15 @@
         return IMW.strokeSeeds(pts, seedRadius(st, work), work.width, work.height);
     }
 
-    // Upscale a work-size mask to the drawing canvas, grow it, and paint it with one undo step.
-    function applyWorkMask(st, work, mask, mode) {
+    // Upscale a work-size mask to the drawing canvas and grow it. Pure: touches neither canvas nor history.
+    function canvasMask(st, work, mask) {
         const c = st.info.drawingCanvas;
         const up = IMW.upscaleMask(mask, work.width, work.height, c.width, c.height);
-        const grown = IMW.growMask(up, c.width, c.height, settings.grow);
+        return IMW.growMask(up, c.width, c.height, settings.grow);
+    }
+
+    // Paint a canvas-size mask with one undo step and report its size.
+    function paintMask(st, grown, mode) {
         applySelection(st.info, grown, mode);
         let count = 0;
         for (let i = 0; i < grown.length; i++) if (grown[i]) count++;
@@ -428,7 +452,7 @@
     function runBrush(st, work, stroke) {
         const seeds = strokeMask(st, work, stroke);
         const mask = IMW.brushSelect(work, seeds, settings.tolerance);
-        applyWorkMask(st, work, mask, effectiveMode(stroke));
+        paintMask(st, canvasMask(st, work, mask), effectiveMode(stroke));
     }
 
     function runBox(st, work, stroke) {
@@ -441,11 +465,12 @@
             setStatus(st, "Box too small", "warn");
             return;
         }
-        endSession(st);
         const mode = effectiveMode(stroke);
-        st.session = { rect, fg: null, bg: null, before: snapshot(st), mode, work };
-        const mask = IMW.boxSelect(work, rect, { fg: null, bg: null }, settings.tolerance);
-        applyWorkMask(st, work, mask, mode);
+        const grown = canvasMask(st, work, IMW.boxSelect(work, rect, { fg: null, bg: null }, settings.tolerance));
+        const before = snapshot(st);
+        endSession(st);
+        paintMask(st, grown, mode);
+        st.session = { rect, fg: null, bg: null, before, mode, work, head: historyHead(st) };
     }
 
     function touchesRect(mask, w, rect) {
@@ -457,8 +482,7 @@
 
     function runRefine(st, work, stroke) {
         const session = st.session;
-        const c = st.info.drawingCanvas;
-        if (!session || session.work !== work || session.before.width !== c.width || session.before.height !== c.height) {
+        if (!sessionValid(st)) {
             endSession(st);
             setStatus(st, "Box expired, draw a new one", "warn");
             return;
@@ -470,19 +494,24 @@
             setStatus(st, "Stroke is outside the box", "warn");
             return;
         }
+        // Work on copies so a throw leaves the session's hints untouched.
         const n = work.width * work.height;
         const toBg = effectiveMode(stroke) === "subtract";
-        const add = toBg ? "bg" : "fg", other = toBg ? "fg" : "bg";
-        if (!session[add]) session[add] = new Uint8Array(n);
-        const into = session[add], from = session[other];
+        const into = session[toBg ? "bg" : "fg"] ? session[toBg ? "bg" : "fg"].slice() : new Uint8Array(n);
+        const from = session[toBg ? "fg" : "bg"] ? session[toBg ? "fg" : "bg"].slice() : null;
         for (let i = 0; i < n; i++) {
             if (!seeds[i]) continue;
             into[i] = 255;
             if (from) from[i] = 0; // the latest stroke wins where hints overlap
         }
-        const mask = IMW.boxSelect(work, session.rect, { fg: session.fg, bg: session.bg }, settings.tolerance);
-        c.getContext("2d").putImageData(session.before, 0, 0);
-        applyWorkMask(st, work, mask, session.mode);
+        const fg = toBg ? from : into, bg = toBg ? into : from;
+        const grown = canvasMask(st, work, IMW.boxSelect(work, session.rect, { fg, bg }, settings.tolerance));
+        // Everything is computed; only now touch the canvas, the history and the session.
+        st.info.drawingCanvas.getContext("2d").putImageData(session.before, 0, 0);
+        paintMask(st, grown, session.mode);
+        session.fg = fg;
+        session.bg = bg;
+        session.head = historyHead(st);
     }
 
     function runStroke(st, stroke) {
@@ -506,8 +535,11 @@
     function finishStroke(st, stroke) {
         st.busy = true;
         setStatus(st, "Selecting…", "busy");
+        // Anything that bumps st.gen (wand off, new picture) or swaps the canvas cancels this stroke.
+        const gen = st.gen, canvas = st.info.drawingCanvas, src = st.info.image.src;
         afterPaint(() => {
             try {
+                if (!st.on || st.gen !== gen || st.info.drawingCanvas !== canvas || st.info.image.src !== src) return;
                 runStroke(st, stroke);
             } catch (error) {
                 fail(st, "Selection failed", error);
@@ -519,12 +551,16 @@
 
     // --- pointer handling --------------------------------------------------------------------------
 
-    // Does a refinement stroke start inside the session box (or within one brush radius of it)?
+    // Does a refinement stroke start inside a still-valid session box (or within one brush radius of it)?
+    // A stale session is dropped here, so the drag becomes a fresh box.
     function startsInSession(st, point) {
-        const session = st.session;
-        if (!session) return false;
-        const work = session.work;
-        const p = toWork(st, work, point), r = session.rect, pad = seedRadius(st, work);
+        if (!st.session) return false;
+        if (!sessionValid(st)) {
+            endSession(st);
+            return false;
+        }
+        const work = st.session.work;
+        const p = toWork(st, work, point), r = st.session.rect, pad = seedRadius(st, work);
         return p.x >= r.x - pad && p.x <= r.x + r.w + pad && p.y >= r.y - pad && p.y <= r.y + r.h + pad;
     }
 
@@ -543,7 +579,7 @@
             const kind = !settings.rect ? "brush" : startsInSession(st, point) ? "refine" : "box";
             st.stroke = { kind, points: [point], pointerId: event.pointerId, shift: event.shiftKey, alt: event.altKey };
             const canvas = st.info.drawingCanvas;
-            if (canvas.style.cursor === "grab") canvas.style.cursor = "";
+            clearPanCursor(st);
             try {
                 canvas.setPointerCapture(event.pointerId);
             } catch (error) {
@@ -557,12 +593,22 @@
         }
     }
 
+    // After a right-drag pan Forge leaves an inline "grab" cursor that beats the wand's crosshair.
+    function clearPanCursor(st) {
+        const canvas = st.info.drawingCanvas, instance = canvasInstance(st.info);
+        if (instance && instance.dragging) return;
+        if (canvas.style.cursor === "grab" || canvas.style.cursor === "grabbing") canvas.style.cursor = "";
+    }
+
     function onPointerMove(st, event) {
         if (!st.on) return;
         try {
             syncOverlay(st);
             const stroke = st.stroke;
-            if (!stroke || event.pointerId !== stroke.pointerId) return; // let Forge pan
+            if (!stroke || event.pointerId !== stroke.pointerId) { // idle, or a pan: let Forge have it
+                if (!stroke) clearPanCursor(st);
+                return;
+            }
             event.preventDefault();
             event.stopImmediatePropagation();
             const point = canvasPoint(st.info, event);
@@ -607,13 +653,30 @@
         }
     }
 
-    function onPointerCancel(st, event) {
+    // Drop a stroke whose pointer is gone: cancelled, capture lost, or released off the canvas.
+    function abandonStroke(st, event) {
         const stroke = st.stroke;
-        if (!stroke || event.pointerId !== stroke.pointerId) return;
-        event.stopImmediatePropagation();
+        if (!stroke || event.pointerId !== stroke.pointerId) return false;
         st.stroke = null;
         try {
             endPointer(st, event);
+        } catch (error) {
+            console.error("Inpaint Magic Wand:", error);
+        }
+        return true;
+    }
+
+    function onPointerCancel(st, event) {
+        if (abandonStroke(st, event)) event.stopImmediatePropagation();
+    }
+
+    // Window-level pointerup/pointercancel: the canvas handler stops the events it handles, so any
+    // that reach the window for an active stroke were released somewhere else.
+    function onWindowPointerEnd(event) {
+        try {
+            allStates.forEach((st) => {
+                if (abandonStroke(st, event) && event.type === "pointerup") setStatus(st, "Stroke cancelled", "warn");
+            });
         } catch (error) {
             console.error("Inpaint Magic Wand:", error);
         }
@@ -671,10 +734,17 @@
         ]);
         strip.hidden = true;
 
-        tolerance.addEventListener("change", () => changeSetting("tolerance", Number(tolerance.value)));
-        mode.addEventListener("change", () => changeSetting("mode", mode.value));
-        rect.addEventListener("change", () => changeSetting("rect", rect.checked));
-        grow.addEventListener("change", () => changeSetting("grow", clampGrow(grow.value)));
+        const onChange = (node, key, read) => node.addEventListener("change", () => {
+            try {
+                changeSetting(key, read());
+            } catch (error) {
+                fail(st, "Setting not saved", error);
+            }
+        });
+        onChange(tolerance, "tolerance", () => Number(tolerance.value));
+        onChange(mode, "mode", () => mode.value);
+        onChange(rect, "rect", () => rect.checked);
+        onChange(grow, "grow", () => clampGrow(grow.value));
         clear.addEventListener("click", () => {
             try {
                 endSession(st);
@@ -690,6 +760,7 @@
         });
         invert.addEventListener("click", () => {
             try {
+                endSession(st); // a later refinement would otherwise restore the pre-box mask over it
                 if (!hasImage(st.info)) {
                     setStatus(st, "No image", "warn");
                     return;
@@ -700,8 +771,9 @@
                 fail(st, "Invert failed", error);
             }
         });
-        // Keep clicks, drags and the wheel on the strip away from Forge's pan, zoom and upload.
-        ["pointerdown", "pointerup", "click", "dblclick", "wheel", "contextmenu"].forEach((type) =>
+        // Keep clicks and the wheel on the strip away from Forge's pan, zoom and upload. pointerup is
+        // left alone so a pan or a stroke released over the strip still ends.
+        ["pointerdown", "click", "dblclick", "wheel", "contextmenu"].forEach((type) =>
             strip.addEventListener(type, (e) => e.stopPropagation()));
 
         st.controls = { tolerance, mode, rect, grow };
@@ -738,6 +810,7 @@
     function setOn(st, on) {
         st.on = on;
         if (!on) {
+            st.gen++; // a stroke still computing must not paint once the wand is off
             endSession(st);
             st.stroke = null;
             st.info.container.classList.remove("imw-stroking");
@@ -787,7 +860,7 @@
             return;
         }
 
-        const st = { info, on: false, stroke: null, session: null, busy: false, workCache: null, pointerInside: false };
+        const st = { info, on: false, stroke: null, session: null, busy: false, workCache: null, pointerInside: false, gen: 0 };
         states.set(info.drawingCanvas, st);
         allStates.forEach((other) => {
             if (other.info.uuid === info.uuid) allStates.delete(other); // canvas rebuilt under the same uuid
@@ -803,6 +876,7 @@
         canvas.addEventListener("pointermove", (e) => onPointerMove(st, e), true);
         canvas.addEventListener("pointerup", (e) => onPointerUp(st, e), true);
         canvas.addEventListener("pointercancel", (e) => onPointerCancel(st, e), true);
+        canvas.addEventListener("lostpointercapture", (e) => abandonStroke(st, e));
         info.image.addEventListener("load", () => {
             try {
                 onImageLoad(st);
@@ -812,7 +886,11 @@
         });
         info.container.addEventListener("pointerenter", () => {
             st.pointerInside = true;
-            if (st.on) positionStrip(st);
+            try {
+                if (st.on) positionStrip(st);
+            } catch (error) {
+                fail(st, "Magic Wand failed", error);
+            }
         });
         info.container.addEventListener("pointerleave", () => {
             st.pointerInside = false;
@@ -820,11 +898,23 @@
         // Forge's undo restores pixels only, so a refinement session cannot survive it.
         ["undoButton_", "redoButton_"].forEach((prefix) => {
             const button = byId(prefix + info.uuid);
-            if (button) button.addEventListener("click", () => endSession(st), true);
+            if (button) button.addEventListener("click", () => {
+                try {
+                    endSession(st);
+                } catch (error) {
+                    console.error("Inpaint Magic Wand:", error);
+                }
+            }, true);
         });
         const toolbar = byId(`toolbar_${info.uuid}`);
         if (toolbar && typeof ResizeObserver === "function") {
-            new ResizeObserver(() => positionStrip(st)).observe(toolbar);
+            new ResizeObserver(() => {
+                try {
+                    positionStrip(st);
+                } catch (error) {
+                    fail(st, "Magic Wand failed", error);
+                }
+            }).observe(toolbar);
         }
     }
 
@@ -853,6 +943,8 @@
             if (!keysAttached) {
                 document.addEventListener("keydown", onKey, true);
                 document.addEventListener("keyup", onKey, true);
+                window.addEventListener("pointerup", onWindowPointerEnd);
+                window.addEventListener("pointercancel", onWindowPointerEnd);
                 keysAttached = true;
             }
             getForgeCanvases().forEach(attachCanvas);
