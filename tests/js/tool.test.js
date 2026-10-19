@@ -225,6 +225,19 @@ test("tool: brush stroke selects the disk in one undo step; Alt subtracts", asyn
     assert.ok(f.alpha() < DISK * 0.2);
 });
 
+test("tool: the strip hint follows Rectangle and a new picture", () => {
+    const f = makeForge();
+    f.on(); f.setRect(false);
+    assert.strictEqual(f.status(), "Brush over the subject");
+    f.setRect(true);
+    assert.strictEqual(f.status(), "Drag a box");
+    f.setRect(false);
+    f.image.src = "data:image/png;img,another";
+    f.image.dispatch({ type: "load" });
+    assert.strictEqual(f.status(), "Brush over the subject");
+    f.button.dispatch({ type: "click" });
+});
+
 test("tool: settings persist in imw.settings", () => {
     const f = makeForge();
     f.on(); f.setRect(true);

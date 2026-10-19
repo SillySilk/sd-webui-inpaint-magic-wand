@@ -264,6 +264,10 @@
         st.status.dataset.kind = kind || "";
     }
 
+    function showHint(st) {
+        setStatus(st, settings.rect ? "Drag a box" : "Brush over the subject", "");
+    }
+
     function fail(st, message, error) {
         console.error("Inpaint Magic Wand:", message, error);
         setStatus(st, message, "error");
@@ -307,7 +311,10 @@
         st.workCache = null;
         st.gen++; // a stroke still computing belongs to the old picture
         endSession(st);
-        if (st.on) prebuildWork(st);
+        if (st.on) {
+            showHint(st); // the last pixel count belonged to the old picture
+            prebuildWork(st);
+        }
     }
 
     // --- sessions ----------------------------------------------------------------------------------
@@ -710,6 +717,7 @@
         saveSettings();
         if (wasRect && !settings.rect) endAllSessions();
         allStates.forEach(syncStrip);
+        if (key === "rect" && wasRect !== settings.rect) allStates.forEach((st) => { if (st.on) showHint(st); });
     }
 
     function buildStrip(st) {
@@ -812,7 +820,7 @@
         st.info.container.classList.toggle("imw-on", on);
         if (st.strip) st.strip.hidden = !on;
         if (on) {
-            setStatus(st, settings.rect ? "Drag a box" : "Brush over the subject", "");
+            showHint(st);
             prebuildWork(st);
         }
         syncToolbarButton(st);
