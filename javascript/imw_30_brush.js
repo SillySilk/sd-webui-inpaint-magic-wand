@@ -44,6 +44,12 @@
     //   changed nothing measurable; T 0.4 mostly cut reach; down-weighting lightness helped shading but made
     //   a lighter look-alike background leak.
     // - Diagonal steps cost sqrt(2) times a straight step so the growth is not diamond-shaped.
+    // - Live check on real photos (2026-10-19), values kept: a shirt against a wall is selected cleanly in
+    //   one stroke at 30-60; a face at 40 (60 spills a little past the ears). Two shortfalls neither
+    //   tolerance nor these constants fix: shaded jeans next to a black wall are the same colour (Lab L 4-5
+    //   vs 4) with a soft edge, so the stroke floods the wall at any tolerance (20: 6.0%, 40: 6.6% of the
+    //   image); and a creased orange suit needs 50-60 to fill one panel. The box handles both (box plus one
+    //   Alt stroke gave a clean person), so the docs steer whole-person masks to the box.
     const EDGE_WEIGHT = 12;
     const COLOUR_DIVISOR = 10;
     const T_PER_TOLERANCE = 0.5;
