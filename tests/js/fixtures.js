@@ -61,4 +61,34 @@ function ringGradient(cx, cy, r, atEdge, atReach, reach) {
     };
 }
 
-module.exports = { disk, noise, iou, circleMask, ringGradient };
+// RGBA image of flat-coloured disks ("parts": [{cx, cy, r, color}], painted in order so later parts cover
+// earlier ones) over `background`, a function (x, y) -> [r,g,b].
+function figures(w, h, parts, background) {
+    const out = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            let c = background(x, y);
+            for (const p of parts) if ((x - p.cx) * (x - p.cx) + (y - p.cy) * (y - p.cy) <= p.r * p.r) c = p.color;
+            const o = (y * w + x) * 4;
+            out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 255;
+        }
+    }
+    return out;
+}
+
+// Union of the parts' disks as a mask; parts listed in `minus` are cut out of it (occluders).
+function partsMask(w, h, parts, minus = []) {
+    const m = new Uint8Array(w * h);
+    const hit = (p, x, y) => (x - p.cx) * (x - p.cx) + (y - p.cy) * (y - p.cy) <= p.r * p.r;
+    for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++)
+            if (parts.some((p) => hit(p, x, y)) && !minus.some((p) => hit(p, x, y))) m[y * w + x] = 255;
+    return m;
+}
+
+// Textured background: diagonal stripes cycling through `colors`, each `period` px wide.
+function stripes(colors, period) {
+    return (x, y) => colors[Math.floor((x + y) / period) % colors.length];
+}
+
+module.exports = { disk, noise, iou, circleMask, ringGradient, figures, partsMask, stripes };
