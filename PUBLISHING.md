@@ -28,9 +28,8 @@ https://github.com/gcmdnt90/sd-webui-inpaint-magic-wand.git
 
 Restart the WebUI and check:
 
-- `Magic Wand Integrated` appears in `img2img`.
-- It does not appear in `txt2img`.
-- Click selection works in `img2img -> Inpaint`.
+- The wand button appears in the `img2img -> Inpaint` canvas toolbar.
+- Brush and box selection work in `img2img -> Inpaint`.
 
 ## Submit To The A1111 Extension Index
 

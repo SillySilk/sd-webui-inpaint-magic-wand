@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Canvas wand tool
+
+The click-to-flood wand is replaced by a selection tool on the inpaint canvas.
+
+- The wand button in the canvas toolbar now turns a wand tool on and off. While it is on,
+  left-drags on the canvas select instead of painting, and a settings strip sits at the
+  bottom of the canvas.
+- **Brush selection**: drag over the subject and the selection spreads to its edges. It
+  uses colour and edge strength, so it no longer floods into the background the way a
+  high-tolerance single-colour flood did.
+- **Box selection** (`Rectangle`): drag a box and the subject is cut out of the background
+  (GrabCut-style colour models plus a graph cut). Strokes inside the box refine the cut:
+  Alt-drag marks "not subject", a plain drag marks "subject". This separates two people
+  who touch.
+- Each stroke, box and refinement is one Forge undo step. An undo, Invert, Clear, a new
+  image, or turning the wand off ends the box's refinement.
+- The selection is cleaned (no pinholes or specks), smoothed, then grown by `Grow`.
+- The brush size comes from Forge's `Brush Width`.
+- Shift adds and Alt subtracts for one stroke or box. While the wand is on, Shift no longer
+  switches on the ForgeUI-MaskEraser extension's eraser, and the browser's own Alt action is
+  suppressed over the canvas.
+- Settings (Tolerance, Mode, Rectangle, Grow) are remembered in the browser.
+- Removed: the `Magic Wand Integrated` accordion, the Python script, single-click selection
+  and the Contiguous option.
+- Added unit tests (`node --test "tests/js/*.test.js"`), no dependencies.
+
+### Before the canvas tool
+
 - Works on `img2img -> Inpaint sketch` as well as `Inpaint`; sketch selections use the current sketch color.
 - Wand clicks, Clear mask, and Invert mask now create a single undo step on the ForgeCanvas (Undo/Redo buttons and Ctrl+Z work).
 - The mask is drawn straight onto the canvas instead of through an async data-URL round trip, so the Gradio mask can no longer be synced before the selection lands.

@@ -14,18 +14,22 @@ Thanks for helping improve Inpaint Magic Wand.
 
 The extension intentionally has no Python dependencies.
 
-The Python script creates the integrated accordion. The JavaScript reads the Forge
-inpaint canvas, computes the selection in the browser, and writes the generated mask
-back to the hidden Forge foreground image field.
+There is no Python script: Forge loads `javascript/*.js` and `style.css` on its own. The
+files load in name order. `imw_10` to `imw_50` are pure selection code (work image, mask
+clean-up, brush, max-flow, box cut) with no DOM access. `imw_90_tool.js` wires them to
+Forge's `ForgeCanvas`: the toolbar button, the strip, the drag overlay, and painting the
+result onto the drawing canvas with one `saveState()` per action.
 
 Please avoid adding model downloads or server-side image processing unless the feature
 has a clear reason to stop being lightweight.
 
 ## Testing Checklist
 
-- The extension loads without startup errors.
-- The accordion appears on `img2img` only.
-- Selection works in `img2img -> Inpaint`.
+- `node --test "tests/js/*.test.js"` passes.
+- The extension loads without console errors.
+- The wand button appears after `Center Position [R]` on `Inpaint` and `Inpaint sketch`.
+- With the wand off, Forge's brush paints normally.
+- Brush strokes and boxes select the subject; Shift adds, Alt subtracts.
 - Replace, add, subtract, and intersect all modify the current mask as expected.
-- Clear and invert affect the inpaint mask.
-- Normal brush masking still works when click selection is disabled.
+- Clear and Invert affect the mask; every action is one undo step.
+- The drag overlay stays on the image after panning and zooming.
