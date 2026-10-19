@@ -244,13 +244,15 @@ test("tool: over a wand canvas, Shift keydown stops before window listeners (era
     f.button.dispatch({ type: "click" });
 });
 
-test("tool: the strip hint follows Rectangle and a new picture", () => {
+test("tool: the strip hint follows Rectangle and a new picture", async () => {
     const f = makeForge();
     f.on(); f.setRect(false);
     assert.strictEqual(f.status(), "Brush over the subject");
     f.setRect(true);
     assert.strictEqual(f.status(), "Drag a box");
     f.setRect(false);
+    await f.drag([[95, 80], [105, 80]]);
+    assert.match(f.status(), /px$/, "a stroke leaves its pixel count");
     f.image.src = "data:image/png;img,another";
     f.image.dispatch({ type: "load" });
     assert.strictEqual(f.status(), "Brush over the subject");
