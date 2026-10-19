@@ -911,11 +911,13 @@
                     if (st.info.container.offsetParent !== null) endSession(st);
                 });
             }
-            if (event.key === "Alt") {
-                allStates.forEach((st) => {
-                    if (st.on && st.pointerInside) event.preventDefault();
-                });
-            }
+            const overWand = [...allStates].some((st) => st.on && st.pointerInside);
+            if (event.key === "Alt" && overWand) event.preventDefault();
+            // Shift means "add" to the wand, but the ForgeUI-MaskEraser extension (a window keydown
+            // listener) also switches its eraser on for any Shift keydown. Over a wand canvas, keep the
+            // Shift keydown from reaching it. Keyup is never stopped: if the eraser did start (Shift
+            // pressed elsewhere, or with another key), its own keyup must still switch it off.
+            if (event.type === "keydown" && event.key === "Shift" && overWand) event.stopPropagation();
         } catch (error) {
             console.error("Inpaint Magic Wand:", error);
         }

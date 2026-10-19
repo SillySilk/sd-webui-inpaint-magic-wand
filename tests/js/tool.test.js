@@ -111,8 +111,12 @@ global.document = {
     createElement: (t) => (t === "canvas" ? new Canvas() : new El(t)),
     getElementById: (id) => byIdMap.get(id) || null,
     querySelector: (sel) => (sel.includes("logical_image_foreground") ? byIdMap.get("__fg") : null),
-    addEventListener() {},
+    listeners: {},
+    addEventListener(type, fn, capture) {
+        (this.listeners[type] = this.listeners[type] || []).push({ fn, capture: capture === true });
+    },
 };
+const key = (type, k) => dispatchTo(document.listeners, { type, key: k, shiftKey: k === "Shift" });
 global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } };
 global.onUiLoaded = (fn) => { uiLoaded = fn; };
 global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
@@ -223,6 +227,21 @@ test("tool: brush stroke selects the disk in one undo step; Alt subtracts", asyn
     await f.drag([[100, 80], [101, 80]], { altKey: true });
     assert.strictEqual(f.instance.saves, 2);
     assert.ok(f.alpha() < DISK * 0.2);
+});
+
+test("tool: over a wand canvas, Shift keydown stops before window listeners (eraser) and Alt is suppressed", () => {
+    const f = makeForge();
+    f.container.dispatch({ type: "pointerenter" });
+    assert.ok(!key("keydown", "Shift").stopped, "wand off: the eraser extension still gets Shift");
+    f.on();
+    assert.ok(key("keydown", "Shift").stopped, "wand on, pointer over it: Shift keydown stops");
+    assert.ok(!key("keyup", "Shift").stopped, "keyup always passes, so a started eraser can stop");
+    assert.ok(!key("keydown", "E").stopped, "other keys pass");
+    assert.ok(key("keydown", "Alt").defaultPrevented);
+    f.container.dispatch({ type: "pointerleave" });
+    assert.ok(!key("keydown", "Shift").stopped, "pointer elsewhere: passes");
+    assert.ok(!key("keydown", "Alt").defaultPrevented);
+    f.button.dispatch({ type: "click" });
 });
 
 test("tool: the strip hint follows Rectangle and a new picture", () => {
