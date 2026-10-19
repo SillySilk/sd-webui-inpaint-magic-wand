@@ -4,9 +4,9 @@
 
     // GrabCut-style box selection.
     //   1. Two Lab GMMs (COMPONENTS components, full covariance): foreground from the pixels inside the
-    //      rect, background from a band BAND px wide around it (clipped to the image; the whole image
-    //      outside the rect when that band is empty; when nothing is outside, the BAND px frame inside the
-    //      rect starts as background).
+    //      rect, background from a band BAND px wide around it (clipped to the image; when the box fills
+    //      the whole image there is no band, and the inner-frame rule below covers it: the BAND px frame
+    //      inside the rect starts as background).
     //   2. Data terms: negative log-likelihood under each GMM. Hints are hard: fg -> source HARD, bg -> sink HARD.
     //   3. Pairwise: gamma * exp(-beta * |dLab|^2) / dist, beta = 1 / (2 * mean |dLab|^2) over the rect's
     //      8-neighbour pairs, gamma = 50 * (1.5 - tolerance / 100). Rect pixels next to the outside also
@@ -189,18 +189,13 @@
         if (!r) return out;
         const rx = r.x, ry = r.y, rw = r.w, rh = r.h, rn = rw * rh;
 
-        // Background samples: the clipped band, else everything outside the rect.
+        // Background samples: the clipped band outside the rect (empty when the box fills the image).
         const bgOutside = [];
         const bx0 = Math.max(0, rx - BAND), by0 = Math.max(0, ry - BAND);
         const bx1 = Math.min(W, rx + rw + BAND), by1 = Math.min(H, ry + rh + BAND);
         for (let y = by0; y < by1; y++)
             for (let x = bx0; x < bx1; x++)
                 if (x < rx || y < ry || x >= rx + rw || y >= ry + rh) bgOutside.push(y * W + x);
-        if (bgOutside.length === 0) {
-            for (let y = 0; y < H; y++)
-                for (let x = 0; x < W; x++)
-                    if (x < rx || y < ry || x >= rx + rw || y >= ry + rh) bgOutside.push(y * W + x);
-        }
 
         // Rect-local labels: 1 = foreground. Start: everything fg except bg hints.
         const label = new Uint8Array(rn);

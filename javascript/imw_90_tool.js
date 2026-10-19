@@ -26,7 +26,7 @@
     // --- settings (shared by both canvases) ----------------------------------------------------
 
     function defaultSettings() {
-        return { tolerance: IMW.DEFAULT_TOLERANCE, mode: "replace", rect: false, grow: GROW_DEFAULT };
+        return { tolerance: IMW.DEFAULT_TOLERANCE, mode: "add", rect: false, grow: GROW_DEFAULT };
     }
 
     function clampGrow(value) {

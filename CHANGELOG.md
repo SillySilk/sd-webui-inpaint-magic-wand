@@ -21,6 +21,7 @@ The click-to-flood wand is replaced by a selection tool on the inpaint canvas.
   Forge's undo or redo, or any other edit that changes Forge's undo history.
 - The selection is cleaned (no pinholes or specks), smoothed, then grown by `Grow`.
 - The brush size comes from Forge's `Brush Width`.
+- Mode defaults to Add, so each brush stroke adds to the selection.
 - Shift adds and Alt subtracts for one stroke or box. While the wand is on, Shift no longer
   switches on the ForgeUI-MaskEraser extension's eraser, and the browser's own Alt action is
   suppressed over the canvas.

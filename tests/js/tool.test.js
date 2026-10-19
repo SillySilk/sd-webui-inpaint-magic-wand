@@ -229,6 +229,19 @@ test("tool: brush stroke selects the disk in one undo step; Alt subtracts", asyn
     assert.ok(f.alpha() < DISK * 0.2);
 });
 
+test("tool: a fresh page defaults to Add, so plain brush strokes accumulate", async () => {
+    const f = makeForge();
+    f.on(); f.setRect(false);
+    assert.strictEqual(f.control(1).value, "add");
+    await f.drag([[95, 80], [105, 80]]);
+    const first = f.alpha();
+    assert.strictEqual(f.canvas.px[(80 * W + 100) * 4 + 3] > 0, true);
+    await f.drag([[10, 10], [14, 10]]);
+    assert.strictEqual(f.instance.saves, 2);
+    assert.ok(f.alpha() > first, "second plain stroke adds to the first");
+    assert.ok(f.canvas.px[(80 * W + 100) * 4 + 3] > 0, "the first stroke's area is still selected");
+});
+
 test("tool: over a wand canvas, Shift keydown stops before window listeners (eraser) and Alt is suppressed", () => {
     const f = makeForge();
     f.container.dispatch({ type: "pointerenter" });
