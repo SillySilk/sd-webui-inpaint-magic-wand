@@ -45,10 +45,6 @@ is over its canvas, Shift goes to the wand instead of switching the eraser on.
 
 ## Installation
 
-Until it is merged into `main`, the canvas wand tool lives on the `canvas-wand` branch.
-Installing from the URL alone takes the default branch (`main`), which still has the old
-click wand, so name the branch as shown below.
-
 ### From the WebUI
 
 1. Open the `Extensions` tab.
@@ -59,16 +55,15 @@ click wand, so name the branch as shown below.
    https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git
    ```
 
-4. In `Specific branch name`, enter `canvas-wand` (leave it empty once the tool is on `main`).
-5. Click `Install`.
-6. Restart the WebUI or reload the UI.
+4. Click `Install`.
+5. Restart the WebUI or reload the UI.
 
 ### Manual Install
 
 Clone the repository into your WebUI `extensions` folder:
 
 ```bash
-git clone -b canvas-wand https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git extensions/sd-webui-inpaint-magic-wand
+git clone https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git extensions/sd-webui-inpaint-magic-wand
 ```
 
 Then restart the WebUI or reload the UI.

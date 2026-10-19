@@ -26,10 +26,6 @@ After pushing, install from the WebUI with:
 https://github.com/SillySilk/sd-webui-inpaint-magic-wand.git
 ```
 
-Until the canvas wand tool is merged into `main`, it lives on the `canvas-wand` branch:
-enter `canvas-wand` in `Specific branch name`, because the URL alone installs the default
-branch (`main`, which still has the old click wand).
-
 Restart the WebUI and check:
 
 - The wand button appears in the `img2img -> Inpaint` canvas toolbar.
