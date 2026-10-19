@@ -783,13 +783,6 @@
         syncStrip(st);
     }
 
-    // Top centre of the container, just under Forge's toolbar so neither covers the other.
-    function positionStrip(st) {
-        if (!st.strip) return;
-        const toolbar = byId(`toolbar_${st.info.uuid}`);
-        st.strip.style.top = `${(toolbar ? toolbar.offsetHeight : 0) + 6}px`;
-    }
-
     function buildOverlay(st) {
         const overlay = el("canvas", { className: "imw-overlay", width: 1, height: 1 });
         overlay.setAttribute("aria-hidden", "true");
@@ -819,7 +812,6 @@
         st.info.container.classList.toggle("imw-on", on);
         if (st.strip) st.strip.hidden = !on;
         if (on) {
-            positionStrip(st);
             setStatus(st, settings.rect ? "Drag a box" : "Brush over the subject", "");
             prebuildWork(st);
         }
@@ -886,11 +878,6 @@
         });
         info.container.addEventListener("pointerenter", () => {
             st.pointerInside = true;
-            try {
-                if (st.on) positionStrip(st);
-            } catch (error) {
-                fail(st, "Magic Wand failed", error);
-            }
         });
         info.container.addEventListener("pointerleave", () => {
             st.pointerInside = false;
@@ -906,16 +893,6 @@
                 }
             }, true);
         });
-        const toolbar = byId(`toolbar_${info.uuid}`);
-        if (toolbar && typeof ResizeObserver === "function") {
-            new ResizeObserver(() => {
-                try {
-                    positionStrip(st);
-                } catch (error) {
-                    fail(st, "Magic Wand failed", error);
-                }
-            }).observe(toolbar);
-        }
     }
 
     function onKey(event) {

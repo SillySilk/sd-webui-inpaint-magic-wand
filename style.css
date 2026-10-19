@@ -9,12 +9,14 @@
     color: #111111 !important;
 }
 
-/* Floating settings strip, top centre of the canvas while the wand is on */
+/* Floating settings strip, bottom centre of the canvas while the wand is on. Forge's two-row
+   toolbar already covers the top; under it, the strip hid the subject's head in a 512 px canvas. */
 .imw-strip {
     align-items: center;
     background: rgba(20, 20, 24, 0.92);
     border: 1px solid #555555;
     border-radius: 8px;
+    bottom: 6px;
     color: #dddddd;
     display: flex;
     flex-wrap: wrap;
@@ -25,8 +27,8 @@
     max-width: calc(100% - 16px);
     padding: 6px 10px;
     position: absolute;
-    top: 6px;
     transform: translateX(-50%);
+    width: max-content; /* with left: 50% alone it only gets half the room and wraps to two rows */
     user-select: none;
     z-index: 11;
 }
